@@ -109,6 +109,9 @@ main{flex:1;padding:14px 16px calc(92px + env(safe-area-inset-bottom,0px))}
 .day-head{display:flex;align-items:center;justify-content:space-between;margin:16px 2px 9px}
 .day-head h2{font-size:14px;font-weight:800;margin:0;letter-spacing:-.3px}
 .day-head .sub{font-size:10.5px;color:var(--ink-mute);font-weight:600;margin-left:6px}
+.day-rev{display:inline-flex;align-items:baseline;gap:6px;flex-wrap:wrap;max-width:calc(100% - 6px);margin:-2px 3px 10px;padding:4px 9px;border-radius:9px;background:var(--accent-soft);font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:-.2px}
+.day-rev b{font-size:13.5px;font-weight:800;color:var(--ink);letter-spacing:-.3px}
+.day-rev .plus{font-size:10.5px;font-weight:700;color:var(--ink-mute)}
 .appt{display:flex;gap:10px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:11px 12px;margin-bottom:8px;box-shadow:var(--sh)}
 .appt-when{font-size:11.5px;font-weight:800;color:var(--accent-deep);letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .appt-memo{display:inline-block;max-width:100%;margin-top:6px;font-size:10.5px;font-weight:800;color:var(--ink-soft);background:var(--accent-soft);border-radius:7px;padding:2px 8px;letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -598,12 +601,16 @@ var INV_CATS = ['젤','파츠','케어','속눈썹','소모품'];
 var TASTE_TAGS = ['큐티클 예민','매트 선호','글리터 선호','얇은 손톱','연장 자주함','손톱 물어뜯음','짧은 손톱 선호','아트 좋아함','향 민감'];
 var DEFAULT_AFTERCARE = '오늘 시술 받으신 손톱 관리 안내드려요.\n① 큐티클 오일을 하루 1~2회 발라주세요\n② 뜨거운 물·사우나·설거지는 되도록 피해주세요\n③ 손톱 끝으로 물건을 열지 마세요\n다음 리터치 권장일은 {date}이에요.';
 var DEFAULT_REMINDER_TPL = '{고객명}님 {매장명} {날짜} 예약 안내드려요. {메뉴} 편한 시간에 오세요🩷';
+var DEFAULT_EXPIRY_TPL = '{고객명}님,\n네일프롬제제의 선불액이 곧 만료될 예정입니다.\n\n잔액 {잔액}원 (유효기간 {유효기간})\n\n참고 부탁드립니다. 감사합니다.';
+var DEFAULT_DEDUCT_TPL = '{고객명}님,\n네일프롬제제의 선불액이 차감 완료되었습니다.\n\n차감 {차감액}원 · 잔여 {잔액}원 (유효기간 {유효기간})\n\n이용해주셔서 감사합니다.';
 var DEFAULT_SETTINGS = {
   shopName: '',
   greeting: '안녕하세요!',
   signoff: '오늘도 좋은 하루 보내세요🩷',
   aftercare: DEFAULT_AFTERCARE,
-  reminderTemplate: ''
+  reminderTemplate: '',
+  expiryTemplate: '',
+  deductTemplate: ''
 };
 var WEEK = ['일','월','화','수','목','금','토'];
 var STATUS = {
@@ -698,6 +705,10 @@ function loadState(){
     if (!s.kpi) s.kpi = null;
     if (!Array.isArray(s.menus) || !s.menus.length){
       s.menus = DEFAULT_MENUS.map(function(m){ return { id:uid(), name:m.name, price:m.price, minutes:m.minutes, category:m.category }; });
+    }
+    // 선불권 등록일·유효기간을 마지막 충전일 기준 1년으로 맞춘다 (기존 폰 데이터 그대로, 재업로드 불필요)
+    if (syncPrepaidDates(s.customers, chargeDatesMap(s))){
+      try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (err){ /* 저장 실패해도 화면은 계속 */ }
     }
     return s;
   } catch (err){ return null; }
@@ -805,12 +816,60 @@ function expiryInfo(m){
   var d = daysToExpiry(m);
   if (d === null) return null;
   if (d < 0) return { label:'만료', cls:'st-low', days:d };
+  if (d === 0) return { label:'오늘 만료', cls:'st-low', days:d };
   if (d <= 30) return { label:'만료 D-' + d, cls:'st-due', days:d };
   return { label:'D-' + d, cls:'st-ok', days:d };
 }
 function datePlusMonths(n){
   var d = new Date(); d.setMonth(d.getMonth() + n);
   return iso(d);
+}
+// 등록일 + 1년 (2월 29일 등록은 다음 해 2월 28일로)
+function isLeapYear(y){ return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0; }
+function addOneYear(s){
+  var str = String(s || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(str)) return '';
+  var d = parseISO(str);
+  var y = d.getFullYear() + 1, mo = d.getMonth(), da = d.getDate();
+  if (mo === 1 && da === 29 && !isLeapYear(y)) da = 28;
+  return iso(new Date(y, mo, da));
+}
+// 고객별 마지막 선불 충전일 (앱 충전 기록 + 백업으로 들어온 선불 판매)
+function chargeDatesMap(s){
+  var map = {};
+  function put(cid, date){
+    if (!cid || !date) return;
+    if (!map[cid] || date > map[cid]) map[cid] = date;
+  }
+  ((s && s.mlogs) || []).forEach(function(l){ if (l && l.action === 'charge') put(l.customerId, l.date); });
+  var k = s && s.kpi;
+  if (k && k.prepaidSales) k.prepaidSales.forEach(function(x){ if (x) put(x.customerId, x.date); });
+  return map;
+}
+// 선불권 등록일·유효기간 보정: 마지막 충전일 기준 1년
+function syncPrepaidDates(customers, charges){
+  var map = charges || {};
+  var n = 0;
+  (customers || []).forEach(function(c){
+    var m = c && c.membership;
+    if (!m) return;
+    var op = String(m.openedAt || '');
+    var last = map[c.id] || '';
+    if (last && last > op){          // 마지막 충전이 등록일보다 뒤 → 등록일·유효기간 모두 그 날짜 기준으로
+      var e1 = addOneYear(last);
+      if (m.openedAt !== last || (e1 && m.expiresAt !== e1)){
+        m.openedAt = last;
+        if (e1) m.expiresAt = e1;
+        n++;
+      }
+      return;
+    }
+    if (!m.expiresAt && op){         // 유효기간이 비어 있으면 등록일 + 1년
+      var e2 = addOneYear(op);
+      if (e2){ m.expiresAt = e2; n++; }
+    }
+  });
+  return n;
 }
 function lowBalanceCustomers(){
   return state.customers.filter(isLowBalance).sort(function(a,b){
@@ -853,6 +912,31 @@ function monthRevenue(y, m){
     sum += num(l.amount);
   });
   return sum;
+}
+// 하루 매출: 기간별 매출 조회·월 결산과 같은 기준 — 시술 실결제(net) + 선불권·정기권 신규 충전
+// 선불 차감(회원권 차감)은 충전할 때 이미 매출로 잡히므로 빼고 센다.
+// 2026-01-01 이전은 월 단위 결산만 있어 날짜별로 나눌 수 없다 → null
+var DAY_SALES_FROM = '2026-01-01';
+function salesOnDay(date){
+  if (String(date) < DAY_SALES_FROM) return null;
+  var rec = 0, chg = 0;
+  state.records.forEach(function(r){
+    if (r.date !== date) return;
+    if (r.net === undefined || r.net === null){
+      rec += (r.pay === PAY_MEM) ? 0 : num(r.amount);
+    } else {
+      rec += num(r.net);
+    }
+  });
+  state.mlogs.forEach(function(l){
+    if (l.action === 'charge' && l.date === date) chg += num(l.amount);
+  });
+  if (state.kpi && state.kpi.prepaidSales){
+    state.kpi.prepaidSales.forEach(function(x){
+      if (x.date === date) chg += num(x.net);
+    });
+  }
+  return { total: rec + chg, rec: rec, charge: chg };
 }
 function apptName(a){
   var c = a.customerId ? custById(a.customerId) : null;
@@ -936,6 +1020,40 @@ function msgUse(c, m, value){
   }
   return joinMsg(head, '오늘 시술로 회원권 ' + value + '회 차감되어 ' + m.balance + '회 남으셨어요🩷 감사합니다!');
 }
+// 선불 차감 안내 문자 (설정에서 문구 수정 가능)
+function msgDeduct(c, m, value){
+  var tpl = String(state.settings.deductTemplate || '').trim() || DEFAULT_DEDUCT_TPL;
+  var isAmt = m.type === 'amount';
+  // 금액은 '원' 없이 숫자만 넣는다 (문구에 '원'을 직접 쓴다)
+  return tidyMsgText(tpl
+    .replace(/\{고객명\}/g, c.name)
+    .replace(/\{차감액\}/g, isAmt ? num(value).toLocaleString('ko-KR') : (num(value) + '회'))
+    .replace(/\{잔액\}/g, isAmt ? num(m.balance).toLocaleString('ko-KR') : (num(m.balance) + '회'))
+    .replace(/\{유효기간\}/g, m.expiresAt ? dotDate(m.expiresAt) : '—')
+    .replace(/\{인사말\}/g, hello())
+    .replace(/\{매장명\}/g, String(state.settings.shopName || '').trim()))
+    .replace(/(\d)회원(?![가-힣])/g, '$1회');
+}
+// 선불 소멸 안내 문자 (유효기간 한 달 전)
+function msgExpiry(c, m){
+  var tpl = String(state.settings.expiryTemplate || '').trim() || DEFAULT_EXPIRY_TPL;
+  var left = daysToExpiry(m);
+  return tidyMsgText(tpl
+    .replace(/\{고객명\}/g, c.name)
+    .replace(/\{잔액\}/g, m.type === 'amount' ? num(m.balance).toLocaleString('ko-KR') : (num(m.balance) + '회'))
+    .replace(/\{유효기간\}/g, m.expiresAt ? dotDate(m.expiresAt) : '')
+    .replace(/\{남은일수\}/g, left === null ? '' : String(Math.max(0, left)))
+    .replace(/\{인사말\}/g, hello())
+    .replace(/\{매장명\}/g, String(state.settings.shopName || '').trim()))
+    .replace(/(\d)회원(?![가-힣])/g, '$1회');
+}
+// 만료 임박: 선불 잔액이 남아 있고 유효기간이 30일 이내(이미 만료 포함)
+function isExpiringSoon(c){
+  var m = c && c.membership;
+  if (!m || num(m.balance) <= 0) return false;
+  var d = daysToExpiry(m);
+  return d !== null && d <= 30;
+}
 function msgCharge(c, m, value){
   var head = c.name + '님 ' + hello() + ' ';
   if (m.type === 'amount'){
@@ -991,6 +1109,32 @@ function updateReminderPreview(){
   state.settings.reminderTemplate = String(ta.value || '').trim();
   var msg = msgReminder(sampleReminderAppt());
   state.settings.reminderTemplate = saved;
+  box.innerHTML = '<b>미리보기</b><br>' + esc(msg);
+}
+function samplePrepaid(kind){
+  var d = parseISO(todayISO());
+  if (kind !== 'deduct') d.setDate(d.getDate() + 19);
+  return { id:'sample', name:'지해', phone:'', cycleDays:28,
+           membership:{ type:'amount', balance:120000, openedAt:todayISO(), expiresAt:iso(d) } };
+}
+function updateExpiryPreview(){
+  var box = $('expiry-prev'), ta = $('expiry-tpl');
+  if (!box || !ta) return;
+  var saved = state.settings.expiryTemplate;
+  state.settings.expiryTemplate = String(ta.value || '').trim();
+  var sc = samplePrepaid('expiry');
+  var msg = msgExpiry(sc, sc.membership);
+  state.settings.expiryTemplate = saved;
+  box.innerHTML = '<b>미리보기</b><br>' + esc(msg);
+}
+function updateDeductPreview(){
+  var box = $('deduct-prev'), ta = $('deduct-tpl');
+  if (!box || !ta) return;
+  var saved = state.settings.deductTemplate;
+  state.settings.deductTemplate = String(ta.value || '').trim();
+  var sc = samplePrepaid('deduct');
+  var msg = msgDeduct(sc, sc.membership, 40000);
+  state.settings.deductTemplate = saved;
   box.innerHTML = '<b>미리보기</b><br>' + esc(msg);
 }
 function nextRetouchDate(c, rec){
@@ -1223,6 +1367,11 @@ function dayAppointments(){
   var body = isTT
     ? dayTimetable(date, list)
     : (closureCards(date) + (list.length ? list.map(apptCard).join('') : '<div class="empty">이 날은 예약이 없어요<br><span>＋ 새 예약으로 등록할 수 있어요</span></div>'));
+  var ds = salesOnDay(date);
+  var revLine = ds
+    ? '<div class="day-rev">일매출 <b>' + won(ds.total) + '</b>' +
+        (ds.charge ? '<span class="plus">시술 ' + won(ds.rec) + ' + 선불 충전 ' + won(ds.charge) + '</span>' : '') + '</div>'
+    : '<div class="day-rev">일매출 <b>—</b><span class="plus">2026년 1월부터 날짜별 기록이 있어요</span></div>';
   return '<div class="day-head"><h2>' + shortDate(date) + '<span class="sub">예약 ' + booked + '건</span></h2>' +
       '<div style="display:flex;gap:5px;align-items:center">' +
         '<div class="view-tog">' +
@@ -1231,7 +1380,7 @@ function dayAppointments(){
         '</div>' +
         '<button class="chip-add" data-act="closures" data-date="' + date + '">휴무</button>' +
         '<button class="chip-add" data-act="new-appt" data-date="' + date + '">＋ 새 예약</button>' +
-      '</div></div>' + body;
+      '</div></div>' + revLine + body;
 }
 function closureCards(date){
   var list = closureFor(date);
@@ -1636,11 +1785,13 @@ function dPrepaidTab(c){
   }
   var isAmt = m.type === 'amount';
   var exp = expiryInfo(m);
+  var lastUse = null;
+  for (var li = 0; li < logs.length; li++){ if (logs[li].action === 'use'){ lastUse = logs[li]; break; } }
   var sum = '<div class="msum card">' +
       '<div class="msum-main"><span>사용 가능 선불액</span><b>' + (isAmt ? won(m.balance) : m.balance + '회') + '</b></div>' +
       '<div class="msum-grid">' +
         '<div><span>구분</span><b>' + (isAmt ? '정액권' : '횟수권') + '</b></div>' +
-        '<div><span>등록일</span><b>' + dotDate(m.openedAt) + '</b></div>' +
+        '<div><span>최근 충전일</span><b>' + dotDate(m.openedAt) + '</b></div>' +
         '<div><span>유효기간</span><b>' + (m.expiresAt ? dotDate(m.expiresAt) : '—') + '</b></div>' +
       '</div>' +
       (exp && exp.days <= 30 ? '<div class="hint" style="margin-top:9px;color:#A24B54;font-weight:800">' + esc(exp.label) + '</div>' : '') +
@@ -1649,6 +1800,8 @@ function dPrepaidTab(c){
         '<button class="btn sub ghost" data-act="deduct" data-id="' + c.id + '">− 선불액 차감</button>' +
       '</div>' +
       (c.phone ? '<a class="btn sub ghost" style="margin-top:6px" href="' + esc(smsHref(c.phone, msgBalance(c))) + '">잔액 문자 보내기</a>' : '') +
+      (c.phone && isExpiringSoon(c) ? '<a class="btn sub primary" style="margin-top:6px" href="' + esc(smsHref(c.phone, msgExpiry(c, m))) + '">소멸 안내 문자 보내기</a>' : '') +
+      (c.phone && lastUse ? '<a class="btn sub ghost" style="margin-top:6px" href="' + esc(smsHref(c.phone, msgDeduct(c, m, lastUse.value))) + '">최근 차감 문자 보내기</a>' : '') +
     '</div>';
   if (!logs.length) return sum + '<div class="empty">아직 선불 내역이 없어요</div>';
   return sum + '<div class="card pad">' + logs.map(function(l){
@@ -1689,7 +1842,7 @@ function membBlock(c){
   var op = parseISO(m.openedAt);
   return '<div class="mcard">' +
     '<div class="mcard-top"><span>' + (m.type === 'amount' ? '정액권' : '횟수권') + '</span>' +
-      '<span>' + op.getFullYear() + '.' + pad(op.getMonth()+1) + '.' + pad(op.getDate()) + ' 등록</span></div>' +
+      '<span>' + op.getFullYear() + '.' + pad(op.getMonth()+1) + '.' + pad(op.getDate()) + ' 충전</span></div>' +
     '<div class="mcard-bal">' + bal + '</div>' +
     '<div class="mcard-sub">' + (m.type === 'amount' ? '남은 잔액' : '남은 횟수') +
       (isLowBalance(c) ? ' · 재충전 시기예요' : '') + '</div>' +
@@ -1761,7 +1914,8 @@ function renderPrepaid(){
   var countCs = cs.filter(function(c){ return c.membership.type === 'count'; });
   var totalAmount = amountCs.reduce(function(s,c){ return s + num(c.membership.balance); }, 0);
   var totalCount = countCs.reduce(function(s,c){ return s + num(c.membership.balance); }, 0);
-  var shown = ui.preFilter === '재충전 시기' ? low : cs;
+  var expiring = cs.filter(isExpiringSoon);
+  var shown = ui.preFilter === '재충전 시기' ? low : (ui.preFilter === '만료 임박' ? expiring : cs);
   shown = shown.slice();
   if (ui.preSort === '잔액 큰순') shown.sort(function(a,b){ return num(b.membership.balance) - num(a.membership.balance); });
   else if (ui.preSort === '잔액 작은순') shown.sort(function(a,b){ return num(a.membership.balance) - num(b.membership.balance); });
@@ -1776,7 +1930,9 @@ function renderPrepaid(){
       '<button class="primary" data-act="charge" data-id="' + c.id + '">충전</button>' +
       '<button data-act="deduct" data-id="' + c.id + '">차감</button>' +
       '<button data-act="mhistory" data-id="' + c.id + '">이력</button>' +
-      (c.phone ? '<a class="sms" href="' + esc(smsHref(c.phone, msgBalance(c))) + '">잔액 문자</a>' : '');
+      (c.phone ? (isExpiringSoon(c)
+        ? '<a class="sms" href="' + esc(smsHref(c.phone, msgExpiry(c, m))) + '">소멸 안내</a>'
+        : '<a class="sms" href="' + esc(smsHref(c.phone, msgBalance(c))) + '">잔액 문자</a>') : '');
     return '<div class="mrow ' + (lowFlag ? 'low' : '') + '">' +
       '<div class="mrow-top" data-act="open-cust" data-id="' + c.id + '" role="button" tabindex="0" aria-label="' + esc(c.name) + ' 고객 상세 보기">' +
         '<div class="avatar">' + esc((c.name||'?').slice(0,1)) + '</div>' +
@@ -1803,17 +1959,18 @@ function renderPrepaid(){
       '</div>' +
     '</div>' +
     '<div class="chips" style="margin-top:12px">' +
-      ['전체','재충전 시기'].map(function(f){
-        return '<button class="chip ' + (ui.preFilter === f ? 'on' : '') + '" data-act="pre-filter" data-filter="' + f + '">' + f + '</button>';
+      ['전체','재충전 시기','만료 임박'].map(function(f){
+        var label = (f === '만료 임박') ? ('만료 임박 (' + expiring.length + ')') : f;
+        return '<button class="chip ' + (ui.preFilter === f ? 'on' : '') + '" data-act="pre-filter" data-filter="' + f + '">' + label + '</button>';
       }).join('') +
-      '<span class="hint" style="margin-left:auto;align-self:center">30,000원 이하 · 1회 이하</span>' +
     '</div>' +
+    (ui.preFilter === '재충전 시기' ? '<div class="hint" style="margin:-6px 2px 10px">잔액 30,000원 이하 · 남은 횟수 1회 이하인 고객이에요</div>' : '') +
     '<div class="chips" style="margin:-5px 0 12px">' +
       ['기본','잔액 큰순','잔액 작은순'].map(function(sf){
         return '<button class="chip ' + (ui.preSort === sf ? 'on' : '') + '" data-act="pre-sort" data-sort="' + sf + '">' + sf + '</button>';
       }).join('') +
     '</div>' +
-    (rows || '<div class="empty">' + (ui.preFilter === '재충전 시기' ? '재충전 시기가 된 고객이 없어요' : '아직 선불 고객이 없어요') + '<br><span>＋ 등록으로 만들어 보세요</span></div>');
+    (rows || '<div class="empty">' + (ui.preFilter === '재충전 시기' ? '재충전 시기가 된 고객이 없어요' : ui.preFilter === '만료 임박' ? '유효기간이 한 달 안에 끝나는 고객이 없어요' : '아직 선불 고객이 없어요') + '<br><span>' + (ui.preFilter === '만료 임박' ? '유효기간이 30일 이내인 고객만 모아 보여줘요' : '＋ 등록으로 만들어 보세요') + '</span></div>');
 }
 
 /* =========================================================
@@ -2843,7 +3000,7 @@ function openCharge(custId){
     '<form id="form-charge" data-id="' + c.id + '">' +
       typeField +
       '<div class="field"><label>유효기간 (선택)</label>' +
-        '<input type="date" name="expires" value="' + (m && m.expiresAt ? m.expiresAt : '') + '">' +
+        '<input type="date" name="expires" value="' + (m && m.expiresAt ? m.expiresAt : addOneYear((m && m.openedAt) || todayISO())) + '">' +
         '<div class="tags">' +
           '<button type="button" class="tag" data-act="fill" data-target="expires" data-value="' + datePlusMonths(6) + '">+6개월</button>' +
           '<button type="button" class="tag" data-act="fill" data-target="expires" data-value="' + datePlusMonths(12) + '">+1년</button>' +
@@ -3040,6 +3197,20 @@ function openSettings(){
           '<div class="msg-prev" id="reminder-prev"></div>' +
           '<button type="button" class="btn sub ghost" data-act="reminder-reset" style="margin-top:8px">기본 문구로 되돌리기</button>' +
         '</div>' +
+        '<div class="field"><label>선불 소멸 안내 문구</label>' +
+          '<textarea name="expiryTpl" id="expiry-tpl" rows="4" spellcheck="false" style="min-height:96px;padding:11px 12px;border:1px solid var(--line);border-radius:12px;line-height:1.6;resize:vertical">' + esc(state.settings.expiryTemplate || DEFAULT_EXPIRY_TPL) + '</textarea>' +
+          '<div class="hint-line" style="margin-top:6px">유효기간이 한 달 남았을 때 보내는 문자예요 · 엔터로 줄을 바꾸면 그 줄 그대로 들어가요 · {잔액}은 숫자로 들어가니 \'원\'은 문구에 직접 써 주세요</div>' +
+          '<div style="margin:6px 0 0"><span class="tok">{고객명}</span><span class="tok">{잔액}</span><span class="tok">{유효기간}</span><span class="tok">{남은일수}</span><span class="tok">{인사말}</span><span class="tok">{매장명}</span></div>' +
+          '<div class="msg-prev" id="expiry-prev"></div>' +
+          '<button type="button" class="btn sub ghost" data-act="expiry-reset" style="margin-top:8px">기본 문구로 되돌리기</button>' +
+        '</div>' +
+        '<div class="field"><label>선불 차감 안내 문구</label>' +
+          '<textarea name="deductTpl" id="deduct-tpl" rows="4" spellcheck="false" style="min-height:96px;padding:11px 12px;border:1px solid var(--line);border-radius:12px;line-height:1.6;resize:vertical">' + esc(state.settings.deductTemplate || DEFAULT_DEDUCT_TPL) + '</textarea>' +
+          '<div class="hint-line" style="margin-top:6px">시술로 선불을 차감했을 때 보내는 문자예요 · {차감액}·{잔액}은 숫자로 들어가요</div>' +
+          '<div style="margin:6px 0 0"><span class="tok">{고객명}</span><span class="tok">{차감액}</span><span class="tok">{잔액}</span><span class="tok">{유효기간}</span><span class="tok">{인사말}</span><span class="tok">{매장명}</span></div>' +
+          '<div class="msg-prev" id="deduct-prev"></div>' +
+          '<button type="button" class="btn sub ghost" data-act="deduct-reset" style="margin-top:8px">기본 문구로 되돌리기</button>' +
+        '</div>' +
         '<button class="btn sub primary" type="submit">저장</button>' +
       '</form>' +
     '</div>' +
@@ -3080,6 +3251,8 @@ function openSettings(){
     '</div>'
   );
   updateReminderPreview();
+  updateExpiryPreview();
+  updateDeductPreview();
   var upd = $('app-updated');
   if (upd) upd.textContent = appUpdatedLabel();
 }
@@ -3153,6 +3326,7 @@ function handleImport(file){
         next.closures = Array.isArray(data.closures) ? data.closures : [];
         next.kpi = (data.kpi && typeof data.kpi === 'object') ? data.kpi : null;
         if (Array.isArray(data.menus) && data.menus.length) next.menus = data.menus;
+        syncPrepaidDates(next.customers, chargeDatesMap(next));
         state = next;
         save();
         ui.detailId = null;
@@ -3295,11 +3469,11 @@ function applyCSV(rows){
     var c = { id:uid(), name:p.name, phone:p.phone, cycleDays:p.cycle || 28,
               memo:p.memo, createdAt:todayISO(), membership:null, tags:[], noshow:0, vip:null, stamps:0 };
     if (p.balance > 0){
-      c.membership = { type:'amount', balance:p.balance, openedAt:todayISO() };
+      c.membership = { type:'amount', balance:p.balance, openedAt:todayISO(), expiresAt:addOneYear(todayISO()) };
       state.mlogs.push({ id:uid(), customerId:c.id, date:todayISO(), action:'charge', type:'amount',
         value:p.balance, amount:p.balance, balanceAfter:p.balance, memo:'CSV 가져오기' });
     } else if (p.count > 0){
-      c.membership = { type:'count', balance:p.count, openedAt:todayISO() };
+      c.membership = { type:'count', balance:p.count, openedAt:todayISO(), expiresAt:addOneYear(todayISO()) };
       state.mlogs.push({ id:uid(), customerId:c.id, date:todayISO(), action:'charge', type:'count',
         value:p.count, amount:0, balanceAfter:p.count, memo:'CSV 가져오기' });
     }
@@ -3498,7 +3672,7 @@ function handleSubmit(e){
       if (memType === 'amount'){
         var v = Math.max(0, parseInt(fd.get('memAmount'), 10) || 0);
         if (v > 0){
-          cust.membership = { type:'amount', balance:v, openedAt:todayISO() };
+          cust.membership = { type:'amount', balance:v, openedAt:todayISO(), expiresAt:addOneYear(todayISO()) };
           state.mlogs.push({ id:uid(), customerId:cust.id, date:todayISO(), action:'charge', type:'amount',
             value:v, amount:v, balanceAfter:v, memo:'회원권 신규 등록' });
         }
@@ -3506,7 +3680,7 @@ function handleSubmit(e){
         var cnt = Math.max(0, parseInt(fd.get('memCount'), 10) || 0);
         var paid = Math.max(0, parseInt(fd.get('memPaid'), 10) || 0);
         if (cnt > 0){
-          cust.membership = { type:'count', balance:cnt, openedAt:todayISO() };
+          cust.membership = { type:'count', balance:cnt, openedAt:todayISO(), expiresAt:addOneYear(todayISO()) };
           state.mlogs.push({ id:uid(), customerId:cust.id, date:todayISO(), action:'charge', type:'count',
             value:cnt, amount:paid, balanceAfter:cnt, memo:'회원권 신규 등록' });
         }
@@ -3582,7 +3756,7 @@ function handleSubmit(e){
       resRows.push(['차감', mm2.type === 'amount' ? won(usedValue) : (usedValue + '회')]);
       resRows.push(['남은 ' + (mm2.type === 'amount' ? '잔액' : '횟수'),
         mm2.type === 'amount' ? won(mm2.balance) : (mm2.balance + '회')]);
-      smsList.push({ label:'선불 잔액 안내 문자', text: msgUse(c2, mm2, usedValue) });
+      smsList.unshift({ label:'차감 문자 보내기', text: msgDeduct(c2, mm2, usedValue) });
       resTitle = '선불 차감 완료';
     }
     showResult(resTitle, resRows, c2, smsList);
@@ -3607,9 +3781,14 @@ function handleSubmit(e){
       if (value3 <= 0){ toast('충전 횟수를 입력해 주세요'); return; }
     }
     var m3 = c3.membership;
-    if (!m3){ m3 = { type:t3, balance:0, openedAt:todayISO() }; c3.membership = m3; }
+    var chargeDay3 = todayISO();
+    if (!m3){ m3 = { type:t3, balance:0, openedAt:chargeDay3, expiresAt:addOneYear(chargeDay3) }; c3.membership = m3; }
     m3.balance += value3;
-    m3.expiresAt = String(f3.get('expires') || '').trim();
+    m3.openedAt = chargeDay3;                 // 등록일 = 마지막 충전일
+    var exp3 = String(f3.get('expires') || '').trim();
+    var auto3 = addOneYear(chargeDay3);       // 유효기간은 최소 충전일 + 1년
+    if (!exp3 || exp3 < auto3) exp3 = auto3;
+    m3.expiresAt = exp3;
     state.mlogs.push({ id:uid(), customerId:c3.id, date:todayISO(), action:'charge', type:m3.type,
       value:value3, amount:paid3, balanceAfter:m3.balance, memo:'선불 충전' });
     save();
@@ -3646,7 +3825,7 @@ function handleSubmit(e){
     showResult('선불 차감 완료',
       [['차감', m4.type === 'amount' ? won(v4) : (v4 + '회')],
        ['남은 ' + (m4.type === 'amount' ? '잔액' : '횟수'), m4.type === 'amount' ? won(m4.balance) : (m4.balance + '회')]],
-      c4, [{ label:'차감 안내 문자', text: msgUse(c4, m4, v4) }]);
+      c4, [{ label:'차감 문자 보내기', text: msgDeduct(c4, m4, v4) }]);
     return;
   }
 
@@ -3684,6 +3863,8 @@ function handleSubmit(e){
     state.settings.signoff = String(f6.get('signoff') || '').trim();
     state.settings.aftercare = String(f6.get('aftercare') || '').trim() || DEFAULT_AFTERCARE;
     state.settings.reminderTemplate = String(f6.get('reminderTpl') || '').trim();
+    state.settings.expiryTemplate = String(f6.get('expiryTpl') || '').trim();
+    state.settings.deductTemplate = String(f6.get('deductTpl') || '').trim();
     save();
     renderAll();
     toast('설정을 저장했어요');
@@ -3979,6 +4160,20 @@ function onAct(act, el){
       toast('기본 문구로 되돌렸어요 · 저장을 눌러 주세요');
       break;
     }
+    case 'expiry-reset': {
+      var et = $('expiry-tpl');
+      if (et) et.value = DEFAULT_EXPIRY_TPL;
+      updateExpiryPreview();
+      toast('기본 문구로 되돌렸어요 · 저장을 눌러 주세요');
+      break;
+    }
+    case 'deduct-reset': {
+      var dt2 = $('deduct-tpl');
+      if (dt2) dt2.value = DEFAULT_DEDUCT_TPL;
+      updateDeductPreview();
+      toast('기본 문구로 되돌렸어요 · 저장을 눌러 주세요');
+      break;
+    }
     case 'inv-filter': ui.invFilter = el.getAttribute('data-filter'); renderInventory(); break;
     case 'inv-add': openInventoryForm(); break;
     case 'inv-edit': openInventoryForm(id); break;
@@ -4110,6 +4305,8 @@ function bindEvents(){
       renderCustList();
     }
     if (e.target && e.target.id === 'reminder-tpl') updateReminderPreview();
+    if (e.target && e.target.id === 'expiry-tpl') updateExpiryPreview();
+    if (e.target && e.target.id === 'deduct-tpl') updateDeductPreview();
   }, false);
 
   document.addEventListener('change', function(e){
@@ -4287,6 +4484,7 @@ function hydrate(src){
   st.closures = src.closures || [];
   st.kpi = src.kpi || null;
   if (src.menus && src.menus.length) st.menus = src.menus;
+  syncPrepaidDates(st.customers, chargeDatesMap(st));
   return st;
 }
 function init(){
