@@ -259,7 +259,8 @@ main{flex:1;padding:14px 16px calc(92px + env(safe-area-inset-bottom,0px))}
 .msum-grid b{font-size:13.5px;font-weight:800;letter-spacing:-.3px}
 .mrow{background:#fff;border:1px solid var(--line);border-radius:17px;padding:12px;margin-bottom:9px;box-shadow:var(--sh)}
 .mrow.low{border-color:#EBD6D9;background:linear-gradient(180deg,#FDF9FA,#fff)}
-.mrow-top{display:flex;align-items:center;gap:10px}
+.mrow-top{display:flex;align-items:center;gap:10px;cursor:pointer;-webkit-tap-highlight-color:transparent;border-radius:12px;transition:opacity .12s}
+.mrow-top:active{opacity:.6}
 .mrow-name{flex:1;min-width:0}
 .mrow-bal{text-align:right}
 .mrow-bal b{font-size:16px;font-weight:800;letter-spacing:-.5px;display:block;color:var(--accent-2)}
@@ -302,6 +303,31 @@ main{flex:1;padding:14px 16px calc(92px + env(safe-area-inset-bottom,0px))}
 .dist-legend{display:flex;flex-wrap:wrap;gap:6px 12px}
 .dist-legend div{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--ink-soft)}
 .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.rr-main span{font-size:11px;color:var(--ink-soft);display:block}
+.rr-main b{font-size:24px;font-weight:800;letter-spacing:-.8px;display:block;margin:2px 0}
+.rr-main small{font-size:11px;color:var(--ink-mute)}
+.rr-bar{display:flex;height:13px;border-radius:999px;overflow:hidden;margin:12px 0 10px;background:var(--line-soft)}
+.rr-bar i{display:block;height:100%}
+.rr-legend{display:flex;flex-wrap:wrap;gap:6px 12px}
+.rr-legend div{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--ink-soft)}
+.rr-legend b{color:var(--ink)}
+.rr-new{margin-top:12px;padding-top:10px;border-top:1px dashed var(--line);font-size:12px;color:var(--ink-soft);letter-spacing:-.2px}
+.rr-new b{color:var(--accent-deep)}
+.rr-new span{font-size:10.5px;color:var(--ink-mute)}
+.mcmp-sum{font-size:13px;font-weight:800;letter-spacing:-.3px;margin:4px 0 10px}
+.mcmp-sum span{font-size:11px;color:var(--ink-mute);font-weight:600}
+.mcmp-item{padding:7px 0;border-bottom:1px solid var(--line-soft)}
+.mcmp-item:last-child{border-bottom:none}
+.mcmp-row{display:flex;align-items:center;gap:8px}
+.mcmp-row .mlabel{font-size:11px;color:var(--ink-soft);width:46px;flex:none;font-weight:800}
+.mcmp-row .nbar{flex:1;height:10px;border-radius:999px;background:var(--line-soft);overflow:hidden;display:block}
+.mcmp-row .nbar i{display:block;height:100%;border-radius:999px}
+.mcmp-row b{font-size:12px;font-weight:800;letter-spacing:-.3px;flex:none;min-width:76px;text-align:right}
+.mcmp-diff{font-size:10.5px;color:var(--ink-soft);margin:3px 0 0 54px}
+.mcmp-diff span{color:var(--ink-mute)}
+.msg-prev{background:var(--surface-2);border-radius:12px;padding:10px 12px;font-size:12px;line-height:1.6;color:var(--ink-soft);margin-top:8px;white-space:pre-wrap}
+.msg-prev b{color:var(--ink)}
+.tok{display:inline-block;padding:2px 7px;border-radius:7px;background:var(--accent-soft);color:var(--accent-deep);font-size:10.5px;font-weight:700;margin:2px 3px 0 0}
 .pay-legend{display:flex;flex-direction:column;gap:7px;margin-top:10px}
 .pay-row{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--ink-soft)}
 .pay-row b{margin-left:auto;font-size:12px;color:var(--ink);font-weight:800}
@@ -525,11 +551,13 @@ var EXPENSE_CATS = ['재료비','월세','관리비','기타'];
 var INV_CATS = ['젤','파츠','케어','속눈썹','소모품'];
 var TASTE_TAGS = ['큐티클 예민','매트 선호','글리터 선호','얇은 손톱','연장 자주함','손톱 물어뜯음','짧은 손톱 선호','아트 좋아함','향 민감'];
 var DEFAULT_AFTERCARE = '오늘 시술 받으신 손톱 관리 안내드려요.\n① 큐티클 오일을 하루 1~2회 발라주세요\n② 뜨거운 물·사우나·설거지는 되도록 피해주세요\n③ 손톱 끝으로 물건을 열지 마세요\n다음 리터치 권장일은 {date}이에요.';
+var DEFAULT_REMINDER_TPL = '{고객명}님 {매장명} {날짜} 예약 안내드려요. {메뉴} 편한 시간에 오세요🩷';
 var DEFAULT_SETTINGS = {
   shopName: '',
   greeting: '안녕하세요!',
   signoff: '오늘도 좋은 하루 보내세요🩷',
-  aftercare: DEFAULT_AFTERCARE
+  aftercare: DEFAULT_AFTERCARE,
+  reminderTemplate: ''
 };
 var WEEK = ['일','월','화','수','목','금','토'];
 var STATUS = {
@@ -540,7 +568,8 @@ var STATUS = {
 };
 
 var ui = { tab:'calendar', filter:'전체', q:'', detailId:null, preFilter:'전체', invFilter:'전체',
-           calY:0, calM:0, selDate:'', limit:30, dayView:'timetable' };
+           calY:0, calM:0, selDate:'', limit:30, dayView:'timetable',
+           custSort:'기본', preSort:'기본', anaY:0, anaM:0, detailFrom:'customers' };
 var state = null;
 var toastTimer = null;
 
@@ -752,6 +781,24 @@ function revenueIn(start, end){
   });
   return sum;
 }
+function monthRevenue(y, m){
+  var key = y + '-' + pad(m);
+  var k = state.kpi;
+  var asOf = (k && k.asOf) ? k.asOf : null;
+  var sum = (k && k.monthly && k.monthly[key] !== undefined) ? num(k.monthly[key]) : 0;
+  var start = key + '-01', end = key + '-' + pad(new Date(y, m, 0).getDate());
+  state.records.forEach(function(r){
+    if (r.date < start || r.date > end || r.pay === PAY_MEM) return;
+    if (asOf && r.date <= asOf) return;
+    sum += num(r.amount);
+  });
+  state.mlogs.forEach(function(l){
+    if (l.action !== 'charge' || l.date < start || l.date > end) return;
+    if (asOf && l.date <= asOf) return;
+    sum += num(l.amount);
+  });
+  return sum;
+}
 function apptName(a){
   var c = a.customerId ? custById(a.customerId) : null;
   return c ? c.name : (a.guestName || '이름 없음');
@@ -841,8 +888,35 @@ function msgDormant(c){
 function msgReminder(a){
   var d = parseISO(a.date);
   var when = (d.getMonth()+1) + '월 ' + d.getDate() + '일 ' + WEEK[d.getDay()] + '요일' + (a.time ? ' ' + a.time : '');
-  return joinMsg(apptName(a) + '님 ' + hello() + ' ',
-    when + ' 예약 안내드려요.' + (a.menu ? (' 메뉴는 ' + a.menu + '입니다.') : '') + ' 편한 시간에 오세요🩷');
+  var tpl = String(state.settings.reminderTemplate || '').trim() || DEFAULT_REMINDER_TPL;
+  var body = tpl
+    .replace(/\{고객명\}/g, apptName(a))
+    .replace(/\{매장명\}/g, String(state.settings.shopName || '').trim())
+    .replace(/\{날짜\}/g, when)
+    .replace(/\{메뉴\}/g, a.menu || '')
+    .replace(/\{인사말\}/g, hello())
+    .replace(/\s+/g, ' ').trim();
+  var t2 = tailText();
+  if (t2){
+    var hasTail = (String(state.settings.signoff || '').trim() && body.indexOf(String(state.settings.signoff || '').trim()) >= 0) ||
+      (String(state.settings.shopName || '').trim() && body.indexOf(String(state.settings.shopName || '').trim()) >= 0);
+    if (!hasTail) body += ' ' + t2;
+  }
+  return body;
+}
+function sampleReminderAppt(){
+  var up = state.appointments.filter(function(a){ return a.date >= todayISO() && a.status === 'booked'; })
+    .sort(function(a,b){ return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; })[0];
+  return up || { date: todayISO(), time: '14:00', menu: '젤 네일', guestName: '김손님' };
+}
+function updateReminderPreview(){
+  var box = $('reminder-prev'), ta = $('reminder-tpl');
+  if (!box || !ta) return;
+  var saved = state.settings.reminderTemplate;
+  state.settings.reminderTemplate = String(ta.value || '').trim();
+  var msg = msgReminder(sampleReminderAppt());
+  state.settings.reminderTemplate = saved;
+  box.innerHTML = '<b>미리보기</b><br>' + esc(msg);
 }
 function nextRetouchDate(c, rec){
   var base = (rec && rec.date) ? rec.date : todayISO();
@@ -1179,6 +1253,11 @@ function renderCustomers(){
         return '<button class="chip ' + (ui.filter === f ? 'on' : '') + '" data-act="filter" data-filter="' + f + '">' + f + '</button>';
       }).join('') +
     '</div>' +
+    '<div class="chips" style="margin:-5px 0 12px">' +
+      ['기본','매출 큰순','선불 큰순','선불 작은순','방문 많은순'].map(function(sf){
+        return '<button class="chip ' + (ui.custSort === sf ? 'on' : '') + '" data-act="cust-sort" data-sort="' + sf + '">' + sf + '</button>';
+      }).join('') +
+    '</div>' +
     '<div id="cust-list"></div>';
   renderCustList();
 }
@@ -1199,12 +1278,28 @@ function renderCustList(){
       return [c.name, c.phone, c.memo].join(' ').toLowerCase().indexOf(q) >= 0;
     });
   }
-  var order = { due:0, dormant:1, fresh:2, frequent:3 };
-  list.sort(function(a,b){
-    var oa = order[statusKey(a)], ob = order[statusKey(b)];
-    if (oa !== ob) return oa - ob;
-    return (custStats(b).daysSince || -1) - (custStats(a).daysSince || -1);
-  });
+  if (ui.custSort === '매출 큰순'){
+    list.sort(function(a,b){ return custStats(b).total - custStats(a).total; });
+  } else if (ui.custSort === '선불 큰순' || ui.custSort === '선불 작은순'){
+    function memBal(c){ return c.membership ? num(c.membership.balance) : -1; }
+    list.sort(function(a,b){
+      var ba = memBal(a), bb = memBal(b);
+      if (ui.custSort === '선불 큰순') return bb - ba;
+      if (ba < 0 && bb < 0) return 0;
+      if (ba < 0) return 1;
+      if (bb < 0) return -1;
+      return ba - bb;
+    });
+  } else if (ui.custSort === '방문 많은순'){
+    list.sort(function(a,b){ return custStats(b).visits - custStats(a).visits; });
+  } else {
+    var order = { due:0, dormant:1, fresh:2, frequent:3 };
+    list.sort(function(a,b){
+      var oa = order[statusKey(a)], ob = order[statusKey(b)];
+      if (oa !== ob) return oa - ob;
+      return (custStats(b).daysSince || -1) - (custStats(a).daysSince || -1);
+    });
+  }
   if (!list.length){ box.innerHTML = '<div class="empty">조건에 맞는 고객이 없어요</div>'; return; }
   var shown = list.slice(0, ui.limit);
   var html = shown.map(custCard).join('');
@@ -1595,7 +1690,10 @@ function renderPrepaid(){
   var totalAmount = amountCs.reduce(function(s,c){ return s + num(c.membership.balance); }, 0);
   var totalCount = countCs.reduce(function(s,c){ return s + num(c.membership.balance); }, 0);
   var shown = ui.preFilter === '재충전 시기' ? low : cs;
-  shown = shown.slice().sort(function(a,b){ return (isLowBalance(b)?1:0) - (isLowBalance(a)?1:0); });
+  shown = shown.slice();
+  if (ui.preSort === '잔액 큰순') shown.sort(function(a,b){ return num(b.membership.balance) - num(a.membership.balance); });
+  else if (ui.preSort === '잔액 작은순') shown.sort(function(a,b){ return num(a.membership.balance) - num(b.membership.balance); });
+  else shown.sort(function(a,b){ return (isLowBalance(b)?1:0) - (isLowBalance(a)?1:0); });
 
   var rows = shown.map(function(c){
     var m = c.membership, lowFlag = isLowBalance(c);
@@ -1608,7 +1706,7 @@ function renderPrepaid(){
       '<button data-act="mhistory" data-id="' + c.id + '">이력</button>' +
       (c.phone ? '<a class="sms" href="' + esc(smsHref(c.phone, msgBalance(c))) + '">잔액 문자</a>' : '');
     return '<div class="mrow ' + (lowFlag ? 'low' : '') + '">' +
-      '<div class="mrow-top">' +
+      '<div class="mrow-top" data-act="open-cust" data-id="' + c.id + '" role="button" tabindex="0" aria-label="' + esc(c.name) + ' 고객 상세 보기">' +
         '<div class="avatar">' + esc((c.name||'?').slice(0,1)) + '</div>' +
         '<div class="mrow-name"><div class="nm">' + esc(c.name) +
           ' <span class="badge ' + (m.type === 'amount' ? 'st-freq' : 'st-new') + '">' + (m.type === 'amount' ? '정액권' : '횟수권') + '</span>' +
@@ -1637,6 +1735,11 @@ function renderPrepaid(){
         return '<button class="chip ' + (ui.preFilter === f ? 'on' : '') + '" data-act="pre-filter" data-filter="' + f + '">' + f + '</button>';
       }).join('') +
       '<span class="hint" style="margin-left:auto;align-self:center">30,000원 이하 · 1회 이하</span>' +
+    '</div>' +
+    '<div class="chips" style="margin:-5px 0 12px">' +
+      ['기본','잔액 큰순','잔액 작은순'].map(function(sf){
+        return '<button class="chip ' + (ui.preSort === sf ? 'on' : '') + '" data-act="pre-sort" data-sort="' + sf + '">' + sf + '</button>';
+      }).join('') +
     '</div>' +
     (rows || '<div class="empty">' + (ui.preFilter === '재충전 시기' ? '재충전 시기가 된 고객이 없어요' : '아직 선불 고객이 없어요') + '<br><span>＋ 등록으로 만들어 보세요</span></div>');
 }
@@ -1758,6 +1861,86 @@ function renderAnalysis(){
   var mrecs = state.records.filter(function(r){ return r.date >= thisM.start && r.date <= thisM.end; });
   var aov = mrecs.length ? Math.round(mrecs.reduce(function(s,r){ return s + num(r.amount); }, 0) / mrecs.length) : 0;
 
+  /* 재방문율: 전체 누적 + 신규 등록 고객 */
+  function totalVisits(c){ return (num(c.baseVisits) || 0) + recsOf(c.id).length; }
+  var vBase = state.customers.filter(function(c){ return totalVisits(c) >= 1; });
+  var v1 = vBase.filter(function(c){ return totalVisits(c) === 1; });
+  var v24 = vBase.filter(function(c){ var v2 = totalVisits(c); return v2 >= 2 && v2 <= 4; });
+  var v5 = vBase.filter(function(c){ return totalVisits(c) >= 5; });
+  var v2plus = v24.length + v5.length;
+  var rrRate = vBase.length ? Math.round(v2plus / vBase.length * 1000) / 10 : 0;
+  function seg(list2, color){ return list2.length ? '<i style="width:' + Math.round(list2.length / vBase.length * 100) + '%;background:' + color + '"></i>' : ''; }
+  var newCs = state.customers.filter(function(c){ return !num(c.baseVisits); });
+  var newBase = newCs.filter(function(c){ return recsOf(c.id).length >= 1; });
+  var newRep = newCs.filter(function(c){ return recsOf(c.id).length >= 2; });
+  var newHtml = newBase.length
+    ? '<div class="rr-new">신규 등록 고객 재방문율 <b>' + (Math.round(newRep.length / newBase.length * 1000) / 10) + '%</b>' +
+      ' <span>(' + newRep.length + '명 / ' + newBase.length + '명 · 앱에서 등록한 고객 ' + newCs.length + '명)</span></div>'
+    : '<div class="rr-new">새로 등록되는 신규 고객부터 자동 집계돼요 <span>(앱에서 등록한 고객 ' + newCs.length + '명)</span></div>';
+  var rrHtml =
+    '<div class="sec"><div class="sec-head"><h2>재방문율</h2><span class="hint">방문 이력 있는 고객 기준</span></div>' +
+      '<div class="card pad">' +
+        '<div class="rr-main"><span>전체 누적 재방문율 (2회 이상)</span><b>' + rrRate + '%</b>' +
+          '<small>' + v2plus.toLocaleString('ko-KR') + '명 / ' + vBase.length.toLocaleString('ko-KR') + '명</small></div>' +
+        '<div class="rr-bar">' + seg(v1, '#D9D4E6') + seg(v24, '#B4AACD') + seg(v5, '#695D88') + '</div>' +
+        '<div class="rr-legend">' +
+          '<div><span class="dot" style="background:#D9D4E6"></span>1회 방문 <b>' + v1.length.toLocaleString('ko-KR') + '</b></div>' +
+          '<div><span class="dot" style="background:#B4AACD"></span>2~4회 <b>' + v24.length.toLocaleString('ko-KR') + '</b></div>' +
+          '<div><span class="dot" style="background:#695D88"></span>5회 이상 단골 <b>' + v5.length.toLocaleString('ko-KR') + '</b></div>' +
+        '</div>' + newHtml +
+      '</div>' +
+    '</div>';
+
+  /* 월별 매출 비교: 같은 달·연도별 */
+  var yearSet = {};
+  if (state.kpi && state.kpi.monthly) Object.keys(state.kpi.monthly).forEach(function(k2){ yearSet[k2.slice(0, 4)] = 1; });
+  state.records.forEach(function(r){ yearSet[r.date.slice(0, 4)] = 1; });
+  yearSet[String(new Date().getFullYear())] = 1;
+  var cmpYears = Object.keys(yearSet).sort().reverse();
+  if (!ui.anaY || cmpYears.indexOf(String(ui.anaY)) < 0) ui.anaY = Number(cmpYears[0]);
+  if (!ui.anaM) ui.anaM = (new Date().getMonth() + 1);
+  var cmpVals = cmpYears.map(function(y){ return monthRevenue(Number(y), ui.anaM); });
+  var cmpMax = Math.max.apply(null, cmpVals.concat([1]));
+  var cmpRows = cmpYears.map(function(y, i){
+    var v = cmpVals[i];
+    var prevY = cmpYears[i + 1], prevV = prevY ? cmpVals[i + 1] : 0;
+    var diff = '';
+    if (prevY && v > 0 && prevV > 0){
+      var dv = v - prevV, dp = Math.round(dv / prevV * 1000) / 10;
+      diff = '<div class="mcmp-diff">전년 대비 ' + (dv >= 0 ? '+' : '−') + won(Math.abs(dv)) +
+        ' <span>(' + (dv >= 0 ? '+' : '') + dp + '%)</span></div>';
+    }
+    return '<div class="mcmp-item"><div class="mcmp-row"><span class="mlabel">' + y + '년</span>' +
+      '<span class="nbar"><i style="width:' + (v > 0 ? Math.max(3, Math.round(v / cmpMax * 100)) : 0) +
+      '%;background:' + (i === 0 ? '#8C7FAB' : '#C9C4D6') + '"></i></span>' +
+      '<b>' + (v > 0 ? won(v) : '−') + '</b></div>' + diff + '</div>';
+  }).join('');
+  var yearChips = cmpYears.map(function(y){
+    return '<button class="chip ' + (Number(y) === ui.anaY ? 'on' : '') + '" data-act="ana-year" data-year="' + y + '">' + y + '년</button>';
+  }).join('');
+  var monthChips = '';
+  for (var mc = 1; mc <= 12; mc++){
+    monthChips += '<button class="chip ' + (mc === ui.anaM ? 'on' : '') + '" data-act="ana-month" data-m="' + mc + '">' + mc + '월</button>';
+  }
+  var selKey = ui.anaY + '-' + pad(ui.anaM);
+  var selRecs = state.records.filter(function(r){ return r.date.slice(0, 7) === selKey; });
+  var topMap = {};
+  selRecs.forEach(function(r){ var k3 = r.menu || '기타'; topMap[k3] = (topMap[k3] || 0) + 1; });
+  var topArr = Object.keys(topMap).map(function(k3){ return { name:k3, n:topMap[k3] }; })
+    .sort(function(a,b){ return b.n - a.n; }).slice(0, 3);
+  var mcHtml =
+    '<div class="sec"><div class="sec-head"><h2>월별 매출 비교</h2><span class="hint">같은 달·연도별</span></div>' +
+      '<div class="card pad">' +
+        '<div class="chips" style="margin:0 0 8px">' + yearChips + '</div>' +
+        '<div class="chips" style="margin:0 0 10px">' + monthChips + '</div>' +
+        '<div class="mcmp-sum">' + ui.anaY + '년 ' + ui.anaM + '월 매출 <b>' + won(monthRevenue(ui.anaY, ui.anaM)) + '</b></div>' +
+        cmpRows +
+        '<div class="chart-note" style="text-align:left;margin-top:8px">매출 = 실결제 + 선불 충전 · 기록이 없는 달은 − 로 표시돼요</div>' +
+        (topArr.length ? '<div class="mcmp-sum" style="margin-top:10px">' + ui.anaM + '월 시술 ' + selRecs.length + '건 <span>· 인기: ' +
+          topArr.map(function(t){ return esc(t.name) + ' ' + t.n + '건'; }).join(', ') + '</span></div>' : '') +
+      '</div>' +
+    '</div>';
+
   // 결제수단
   var payData = [];
   var pal = ['#8679A6','#B4AACD','#6D6B78','#D9D4E6','#A98B52'];
@@ -1841,6 +2024,8 @@ function renderAnalysis(){
       '<div class="bars">' + bars + '</div>' +
       '<div class="chart-note">월별 매출 (막대 위 숫자는 만원 단위)</div>' +
     '</div>' +
+    rrHtml +
+    mcHtml +
     '<div class="ana-grid">' +
       '<div class="ana"><span>이번 달 객단가</span><b>' + won(aov) + '</b><small>시술 금액 기준</small></div>' +
       '<div class="ana"><span>재방문율</span><b>' + repeatRate + '%</b><small>2회 이상 방문 고객</small></div>' +
@@ -2498,6 +2683,13 @@ function openSettings(){
         '<div class="field"><label>시술 후 관리법 문자</label>' +
           '<textarea name="aftercare" style="min-height:116px">' + esc(state.settings.aftercare || DEFAULT_AFTERCARE) + '</textarea>' +
           '<div class="hint-line">{이름} · {날짜} · {주기} 가 자동으로 바뀌어 들어가요</div></div>' +
+        '<div class="field"><label>예약 리마인드 문자 문구</label>' +
+          '<textarea name="reminderTpl" id="reminder-tpl" style="min-height:88px">' + esc(state.settings.reminderTemplate || DEFAULT_REMINDER_TPL) + '</textarea>' +
+          '<div class="hint-line" style="margin-top:6px">아래 치환 문구가 실제 내용으로 바뀌어 들어가요</div>' +
+          '<div style="margin:6px 0 0"><span class="tok">{고객명}</span><span class="tok">{매장명}</span><span class="tok">{날짜}</span><span class="tok">{메뉴}</span><span class="tok">{인사말}</span></div>' +
+          '<div class="msg-prev" id="reminder-prev"></div>' +
+          '<button type="button" class="btn sub ghost" data-act="reminder-reset" style="margin-top:8px">기본 문구로 되돌리기</button>' +
+        '</div>' +
         '<button class="btn sub primary" type="submit">저장</button>' +
       '</form>' +
     '</div>' +
@@ -2537,6 +2729,7 @@ function openSettings(){
       '</div>' +
     '</div>'
   );
+  updateReminderPreview();
 }
 function openResetView(){
   openSheet(
@@ -3115,6 +3308,7 @@ function handleSubmit(e){
     state.settings.greeting = String(f6.get('greeting') || '').trim() || DEFAULT_SETTINGS.greeting;
     state.settings.signoff = String(f6.get('signoff') || '').trim();
     state.settings.aftercare = String(f6.get('aftercare') || '').trim() || DEFAULT_AFTERCARE;
+    state.settings.reminderTemplate = String(f6.get('reminderTpl') || '').trim();
     save();
     renderAll();
     toast('설정을 저장했어요');
@@ -3203,6 +3397,7 @@ function onAct(act, el){
     case 'tab': go(el.getAttribute('data-tab')); break;
     case 'open-cust':
       if (!id) break;
+      ui.detailFrom = ui.tab || 'customers';
       ui.detailTab = 'info';
       ui.detailId = id; showDetail();
       break;
@@ -3210,6 +3405,7 @@ function onAct(act, el){
       var jumpC = custById(id);
       if (!jumpC) break;
       closeSheet();
+      ui.detailFrom = ui.tab || 'calendar';
       ui.detailTab = 'info';
       ui.detailId = jumpC.id;
       showDetail();
@@ -3225,7 +3421,7 @@ function onAct(act, el){
     case 'new-appt-cust':
       openAppointmentForm(null, todayISO(), '', id || ui.detailId);
       break;
-    case 'back': go('customers'); break;
+    case 'back': go(ui.detailFrom || 'customers'); break;
     case 'new-cust': openCustomerForm(); break;
     case 'edit-cust': openCustomerForm(id); break;
     case 'del-cust': askDeleteCustomer(id); break;
@@ -3377,6 +3573,17 @@ function onAct(act, el){
     case 'go-filter': ui.filter = el.getAttribute('data-filter'); ui.limit = 30; go('customers'); break;
     case 'more-cust': ui.limit += 30; renderCustList(); break;
     case 'pre-filter': ui.preFilter = el.getAttribute('data-filter'); renderPrepaid(); break;
+    case 'pre-sort': ui.preSort = el.getAttribute('data-sort'); renderPrepaid(); break;
+    case 'cust-sort': ui.custSort = el.getAttribute('data-sort'); ui.limit = 30; renderCustList(); break;
+    case 'ana-year': ui.anaY = Number(el.getAttribute('data-year')) || 0; renderAnalysis(); break;
+    case 'ana-month': ui.anaM = Number(el.getAttribute('data-m')) || 1; renderAnalysis(); break;
+    case 'reminder-reset': {
+      var rt = $('reminder-tpl');
+      if (rt) rt.value = DEFAULT_REMINDER_TPL;
+      updateReminderPreview();
+      toast('기본 문구로 되돌렸어요 · 저장을 눌러 주세요');
+      break;
+    }
     case 'inv-filter': ui.invFilter = el.getAttribute('data-filter'); renderInventory(); break;
     case 'inv-add': openInventoryForm(); break;
     case 'inv-edit': openInventoryForm(id); break;
@@ -3504,6 +3711,7 @@ function bindEvents(){
       ui.limit = 30;
       renderCustList();
     }
+    if (e.target && e.target.id === 'reminder-tpl') updateReminderPreview();
   }, false);
 
   document.addEventListener('change', function(e){
@@ -3547,6 +3755,15 @@ function bindEvents(){
 
   document.addEventListener('keydown', function(e){
     if (e.key === 'Escape') closeSheet();
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar'){
+      var kt = e.target;
+      if (!kt || !kt.getAttribute) return;
+      var kAct = kt.getAttribute('data-act');
+      if (!kAct || kt.getAttribute('role') !== 'button') return;
+      if (kt.tagName === 'BUTTON' || kt.tagName === 'A' || kt.tagName === 'INPUT') return;
+      e.preventDefault();
+      onAct(kAct, kt);
+    }
   }, false);
 
   initTimetableDrag();
