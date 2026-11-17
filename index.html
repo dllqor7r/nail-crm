@@ -2073,6 +2073,17 @@ function toggleGuestFields(form){
   var isGuest = !sel || !sel.value;
   form.querySelectorAll('.guest-field').forEach(function(n){ n.hidden = !isGuest; });
 }
+/* 고객 선택을 바꾸면 위의 '고객 상세' 링크도 그 고객으로 바뀐다 */
+function syncCustJump(form, custId){
+  var jump = form ? form.querySelector('.cust-jump') : null;
+  if (!jump) return;
+  var c = custId ? custById(custId) : null;
+  if (!c){ jump.style.display = 'none'; jump.setAttribute('data-id', ''); return; }
+  jump.style.display = '';
+  jump.setAttribute('data-id', c.id);
+  var nameEl = jump.querySelector('b');
+  if (nameEl) nameEl.textContent = c.name;
+}
 
 /* ---------- 휴무 · 마감 ---------- */
 function openClosures(date){
@@ -3505,6 +3516,7 @@ function bindEvents(){
     if (t.name === 'customerId'){
       var f = t.form || (t.closest ? t.closest('form') : null);
       toggleGuestFields(f);
+      syncCustJump(f, t.value);
     }
     if (t.id === 'file-import') handleImport(t.files && t.files[0]);
     if (t.id === 'file-csv') handleCSV(t.files && t.files[0]);
