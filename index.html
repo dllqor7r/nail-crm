@@ -225,7 +225,30 @@ main{flex:1;padding:14px 16px calc(92px + env(safe-area-inset-bottom,0px))}
 .tl-amt{font-size:13.5px;font-weight:800;color:var(--accent-deep);letter-spacing:-.3px}
 .del{border:none;background:none;font-size:10.5px;color:#9A98A6;font-weight:700;padding:4px 2px}
 .tl-note{font-size:11.5px;color:var(--ink-mute);margin-top:6px;line-height:1.5}
+.tl-right{display:inline-flex;align-items:center;gap:8px;flex:none}
 .danger-zone{margin-top:20px}
+/* customer detail tabs */
+.prow{display:flex;align-items:center;gap:12px}
+.pavatar{width:54px;height:54px;flex:none;border-radius:50%;background:var(--accent-soft);color:var(--accent-deep);display:flex;align-items:center;justify-content:center;font-size:21px;font-weight:800}
+.pinfo{flex:1;min-width:0}
+.pname{font-size:17px;font-weight:800;letter-spacing:-.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pbadges{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.pmeta{font-size:11.5px;color:var(--ink-soft);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pacts{display:flex;gap:6px;margin-top:12px}
+.pacts .btn{flex:1}
+.ibtn{width:44px;height:40px;flex:none;border-radius:12px;border:1px solid var(--line);background:#fff;color:var(--accent-deep);font-size:16px;display:flex;align-items:center;justify-content:center;text-decoration:none;box-shadow:var(--sh)}
+.dtabs{position:sticky;top:calc(env(safe-area-inset-top,0px) + 53px);z-index:16;display:flex;gap:1px;margin:14px -16px 12px;padding:0 12px;background:rgba(250,250,252,.96);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.dtabs::-webkit-scrollbar{display:none}
+.dtab{flex:none;border:none;background:none;padding:11px 9px 9px;font-size:12.5px;font-weight:800;color:var(--ink-mute);letter-spacing:-.4px;border-bottom:2px solid transparent;white-space:nowrap}
+.dtab.on{color:var(--accent-deep);border-bottom-color:var(--accent-deep)}
+.dbody{padding-bottom:8px}
+.stat i{display:block;font-style:normal;font-size:10px;color:var(--ink-mute);margin-top:3px;font-weight:600}
+.st-mem{background:#FBE9F0;color:#A9487A}
+.dacts{display:flex;gap:6px;margin-top:12px}
+.dacts .btn{flex:1}
+.cust-jump{width:100%;height:auto;display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--accent-soft);border:1px solid #E3DDF1;border-radius:12px;padding:11px 13px;margin-bottom:7px;text-align:left}
+.cust-jump b{font-size:14.5px;font-weight:800;color:var(--accent-deep);letter-spacing:-.3px}
+.cust-jump span{font-size:11px;font-weight:800;color:var(--accent-deep);white-space:nowrap}
 /* prepaid */
 .msum{padding:16px}
 .msum-main span{font-size:11px;color:var(--ink-soft);display:block}
@@ -356,8 +379,10 @@ select{background-image:none}
 .sopt.dis{opacity:.42}
 .sopt span{pointer-events:none}
 .mcat-tabs{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
-.mcat-btn{border:1px solid var(--line);background:#fff;border-radius:9px;padding:6px 10px;font-size:11.5px;font-weight:700;color:var(--ink-soft);letter-spacing:-.2px}
-.mcat-btn.on{background:var(--accent-soft);border-color:var(--accent-2);color:var(--accent-2);font-weight:800}
+.mcat-btn{display:inline-flex;align-items:center;border:1px solid var(--line);background:#fff;border-radius:9px;padding:6px 10px;font-size:11.5px;font-weight:700;color:var(--ink-soft);letter-spacing:-.2px}
+.mcat-btn.on{background:var(--accent-2);border-color:var(--accent-2);color:#fff;font-weight:800}
+.mcat-n{display:inline-block;margin-left:4px;min-width:13px;padding:1px 4px;border-radius:999px;background:var(--accent-2);color:#fff;font-size:9.5px;font-weight:800;line-height:1.35;text-align:center}
+.mcat-btn.on .mcat-n{background:#fff;color:var(--accent-2)}
 .tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px;max-height:165px;overflow-y:auto}
 .tag{border:1px solid var(--line);background:#F4F2FA;border-radius:10px;padding:7px 10px;font-size:11.5px;font-weight:700;color:var(--accent-2);letter-spacing:-.2px}
 .tag.on{background:var(--accent-2);border-color:var(--accent-2);color:#fff}
@@ -1210,51 +1235,269 @@ function custCard(c){
 /* =========================================================
    고객 상세
    ========================================================= */
+/* =========================================================
+   고객 상세 (탭: 이용 정보 · 이용 기록 · 매출 · 예약 · 선불액)
+   ========================================================= */
+var DETAIL_TABS = [
+  { key:'info',    label:'이용 정보' },
+  { key:'history', label:'이용 기록' },
+  { key:'sales',   label:'매출' },
+  { key:'appts',   label:'예약' },
+  { key:'prepaid', label:'선불액' }
+];
+function apptState(a){
+  if (a.status === 'done') return { label:'이용완료', cls:'st-ok' };
+  if (a.status === 'noshow') return { label:'노쇼', cls:'st-noshow' };
+  if (a.status === 'canceled') return { label:'취소', cls:'st-off' };
+  return { label:'예약확정', cls:'st-due' };
+}
+function dotDate(s){
+  if (!s) return '—';
+  return String(s).slice(0,10).replace(/-/g, '.');
+}
+function apptsOf(id){
+  return state.appointments.filter(function(a){ return a.customerId === id; });
+}
+function mlogsOf(id){
+  return state.mlogs.filter(function(l){ return l.customerId === id; });
+}
+function statCard(label, value, sub){
+  return '<div class="stat"><span>' + label + '</span><b>' + value + '</b>' +
+    (sub ? '<i>' + sub + '</i>' : '') + '</div>';
+}
+
 function renderDetail(){
   var box = $('screen-detail');
   var c = custById(ui.detailId);
   if (!c){ go('customers'); return; }
-  var st = custStats(c), k = statusKey(c), recs = sortedRecs(c.id);
-  var msg = (k === 'dormant') ? msgDormant(c) : msgRevisit(c);
-  var badges = (isVip(c) ? '<span class="badge st-vip">VIP</span>' : '') +
+  var st = custStats(c), k = statusKey(c);
+  var tab = ui.detailTab || 'info';
+  var memb = c.membership;
+  var badges = (memb ? '<span class="badge st-mem">회원</span>' : '') +
+               (isVip(c) ? '<span class="badge st-vip">VIP</span>' : '') +
                (num(c.noshow) > 0 ? '<span class="badge st-noshow">노쇼 ' + num(c.noshow) + '</span>' : '');
-  var phoneBlock = c.phone
-    ? '<div class="btn-row">' +
-        '<a class="btn sub ghost" href="' + esc(telHref(c.phone)) + '">전화</a>' +
-        '<a class="btn sub ghost" href="' + esc(smsHref(c.phone, msg)) + '">문자</a>' +
-        '<a class="btn sub ghost" href="' + esc(smsHref(c.phone, msgAftercare(c, recs[0]))) + '">관리법</a>' +
-      '</div>'
-    : '<div class="note" style="margin:11px 0 0">연락처가 없어 전화·문자를 보낼 수 없어요</div>';
-  var created = parseISO(c.createdAt);
+  var msg = (k === 'dormant') ? msgDormant(c) : msgRevisit(c);
+  var acts = '<div class="pacts">' +
+      '<button class="btn sub primary" data-act="new-appt-cust" data-id="' + c.id + '">예약등록</button>' +
+      '<button class="btn sub ghost" data-act="add-record" data-id="' + c.id + '">시술등록</button>' +
+      (c.phone
+        ? '<a class="ibtn" href="' + esc(telHref(c.phone)) + '" aria-label="전화">☎</a>' +
+          '<a class="ibtn" href="' + esc(smsHref(c.phone, msg)) + '" aria-label="문자">✉</a>'
+        : '') +
+    '</div>';
 
   box.innerHTML =
     '<div class="dhead">' +
       '<button class="round" data-act="back" aria-label="뒤로">‹</button>' +
-      '<div class="dtitle"><h1>' + esc(c.name) + '</h1><span class="badge ' + STATUS[k].cls + '">' + STATUS[k].label + '</span>' + badges + '</div>' +
+      '<div class="dtitle"><h1>' + esc(c.name) + '</h1></div>' +
       '<button class="round" data-act="edit-cust" data-id="' + c.id + '" aria-label="수정">✎</button>' +
     '</div>' +
     '<div class="card pad">' +
-      '<div class="cline">' + esc(c.phone || '연락처 없음') + '</div>' +
-      '<div class="hint" style="margin-top:4px">권장 주기 ' + (num(c.cycleDays)||28) + '일 · 등록 ' +
-        created.getFullYear() + '.' + pad(created.getMonth()+1) + '.' + pad(created.getDate()) + '</div>' +
-      phoneBlock +
+      '<div class="prow">' +
+        '<div class="pavatar">' + esc((c.name || '?').slice(0,1)) + '</div>' +
+        '<div class="pinfo">' +
+          '<div class="pname">' + esc(c.name) + '</div>' +
+          '<div class="pbadges"><span class="badge ' + STATUS[k].cls + '">' + STATUS[k].label + '</span>' + badges + '</div>' +
+          '<div class="pmeta">' + esc(c.phone || '연락처 없음') + '</div>' +
+        '</div>' +
+      '</div>' +
+      acts +
       (c.memo ? '<div class="memo">' + esc(c.memo) + '</div>' : '') +
       (c.tags && c.tags.length ? '<div class="tags-view">' + c.tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') + '</div>' : '') +
     '</div>' +
-    '<div class="stat-grid">' +
-      '<div class="stat"><span>누적 방문</span><b>' + st.visits + '회</b></div>' +
-      '<div class="stat"><span>총 결제액</span><b>' + won(st.total) + '</b></div>' +
-      '<div class="stat"><span>평균 방문 주기</span><b>' + (st.avg ? st.avg + '일' : '—') + '</b></div>' +
-      '<div class="stat"><span>마지막 방문</span><b>' + (st.last ? st.daysSince + '일 전' : '—') + '</b></div>' +
+    '<div class="dtabs">' + DETAIL_TABS.map(function(t){
+      return '<button class="dtab' + (tab === t.key ? ' on' : '') + '" data-act="detail-tab" data-tab="' + t.key + '">' + t.label + '</button>';
+    }).join('') + '</div>' +
+    '<div class="dbody">' + detailBody(c, tab) + '</div>';
+}
+
+function detailBody(c, tab){
+  if (tab === 'history') return dHistoryTab(c);
+  if (tab === 'sales') return dSalesTab(c);
+  if (tab === 'appts') return dApptTab(c);
+  if (tab === 'prepaid') return dPrepaidTab(c);
+  return dInfoTab(c);
+}
+
+/* ---------- 이용 정보 ---------- */
+function dInfoTab(c){
+  var st = custStats(c);
+  var recs = recsOf(c.id);
+  var firstVisit = '';
+  recs.forEach(function(r){ if (r.date && (!firstVisit || r.date < firstVisit)) firstVisit = r.date; });
+  if (c.lastVisit && (!firstVisit || c.lastVisit < firstVisit)) firstVisit = c.lastVisit;
+  var avgSale = st.visits ? Math.round(st.total / st.visits) : 0;
+  var recCnt = recs.length;
+  return '<div class="stat-grid">' +
+      statCard('최근 방문일', st.last ? dotDate(st.last) : '기록 없음',
+               st.last ? (st.daysSince + '일 경과') : '') +
+      statCard('평균 방문 주기', st.avg ? ('약 ' + st.avg + '일') : '—',
+               st.avg ? '기록 ' + recCnt + '건 기준' : '기록이 더 쌓이면 계산돼요') +
+      statCard('총 방문 / 노쇼', st.visits + '회 / ' + num(c.noshow) + '회', '누적 기준') +
+      statCard('최초 방문일', firstVisit ? dotDate(firstVisit) : '—', '등록 ' + dotDate(c.createdAt)) +
+      statCard('누적 실매출', won(st.total), '권장 주기 ' + (num(c.cycleDays) || 28) + '일') +
+      statCard('평균 매출', won(avgSale), '방문 1회 기준') +
     '</div>' +
-    membBlock(c) +
     stampCard(c) +
-    '<div class="sec-head" style="margin-top:20px"><h2>시술 기록 <span class="cnt">' + st.visits + '</span></h2>' +
-      '<button class="chip-add" data-act="add-record" data-id="' + c.id + '">＋ 기록</button></div>' +
-    (recs.length ? '<div class="tl">' + recs.map(tlItem).join('') + '</div>'
-                 : '<div class="empty">아직 시술 기록이 없어요<br><span>＋ 기록으로 첫 시술을 남겨 보세요</span></div>') +
+    (c.phone
+      ? '<div class="dacts" style="margin-top:10px"><a class="btn sub ghost" href="' +
+          esc(smsHref(c.phone, msgAftercare(c, sortedRecs(c.id)[0]))) + '">관리법 문자 보내기</a></div>'
+      : '') +
     '<div class="danger-zone"><button class="btn ghost danger" data-act="del-cust" data-id="' + c.id + '">고객 삭제</button></div>';
 }
+
+/* ---------- 이용 기록 (예약 · 시술 · 선불 타임라인) ---------- */
+function dHistoryTab(c){
+  var items = [];
+  recsOf(c.id).forEach(function(r){ items.push({ date:r.date, time:'', type:'record', r:r }); });
+  apptsOf(c.id).forEach(function(a){ items.push({ date:a.date, time:a.time || '', type:'appt', a:a }); });
+  mlogsOf(c.id).forEach(function(l){ items.push({ date:l.date, time:'', type:'mlog', l:l }); });
+  items.sort(function(x, y){
+    var d = String(y.date || '').localeCompare(String(x.date || ''));
+    if (d !== 0) return d;
+    return String(y.time || '').localeCompare(String(x.time || ''));
+  });
+  if (!items.length){
+    return '<div class="empty">아직 이용 기록이 없어요<br><span>시술등록으로 첫 기록을 남겨 보세요</span></div>';
+  }
+  return '<div class="tl">' + items.map(dHistoryItem).join('') + '</div>';
+}
+function dHistoryItem(it){
+  if (it.type === 'record'){
+    var r = it.r;
+    var notes = [ r.color ? ('컬러 ' + r.color) : '', r.art ? ('아트 ' + r.art) : '', r.memo || '' ]
+      .filter(Boolean).join(' · ');
+    return '<div class="tl-item"><span class="tl-dot"></span>' +
+      '<div class="tl-card">' +
+        '<div class="tl-top"><b>' + dateLabel(r.date) + '</b><span class="paytag">시술</span></div>' +
+        '<div class="tl-menu">' + esc(r.menu) + '</div>' +
+        '<div class="tl-bottom"><span class="tl-amt">' + won(r.amount) + '</span>' +
+          '<span class="tl-right"><span class="hint">' + esc(r.pay || '') + '</span>' +
+          '<button class="del" data-act="del-record" data-id="' + r.id + '">삭제</button></span></div>' +
+        (notes ? '<div class="tl-note">' + esc(notes) + '</div>' : '') +
+        (r.photo ? '<img class="tl-photo" src="' + esc(r.photo) + '" alt="시술 사진" data-act="photo-view" data-id="' + r.id + '">' : '') +
+      '</div></div>';
+  }
+  if (it.type === 'appt'){
+    var a = it.a, s = apptState(a);
+    return '<div class="tl-item"><span class="tl-dot"></span>' +
+      '<div class="tl-card" data-act="edit-appt" data-id="' + a.id + '">' +
+        '<div class="tl-top"><b>' + dateLabel(a.date) + (a.time ? (' · ' + esc(a.time)) : '') + '</b>' +
+          '<span class="badge ' + s.cls + '">' + s.label + '</span></div>' +
+        '<div class="tl-menu">' + esc(a.menu || '메뉴 미정') + '</div>' +
+        '<div class="tl-bottom"><span class="tl-amt">' + (num(a.amount) ? won(a.amount) : '금액 미정') + '</span>' +
+          '<span class="hint">예약' + (a.status === 'booked' ? ' · 탭해서 수정' : '') + '</span></div>' +
+      '</div></div>';
+  }
+  var l = it.l, isCh = l.action === 'charge';
+  var val = l.type === 'amount'
+    ? ((isCh ? '+' : '−') + won(l.value))
+    : ((isCh ? '+' : '−') + l.value + '회');
+  return '<div class="tl-item"><span class="tl-dot"></span>' +
+    '<div class="tl-card">' +
+      '<div class="tl-top"><b>' + dateLabel(l.date) + '</b>' +
+        '<span class="paytag">' + (isCh ? '선불 충전' : '선불 차감') + '</span></div>' +
+      '<div class="tl-menu">' + esc(l.memo || (isCh ? '선불 충전' : '선불 차감')) + '</div>' +
+      '<div class="tl-bottom"><span class="tl-amt">' + val + '</span>' +
+        '<span class="hint">잔여 ' + (l.type === 'amount' ? won(l.balanceAfter) : l.balanceAfter + '회') + '</span></div>' +
+    '</div></div>';
+}
+
+/* ---------- 매출 ---------- */
+function dSalesTab(c){
+  var recs = sortedRecs(c.id);
+  var total = recs.reduce(function(s, r){ return s + num(r.amount); }, 0);
+  var cnt = recs.length;
+  var avg = cnt ? Math.round(total / cnt) : 0;
+  var st = custStats(c);
+  var sum = '<div class="msum card">' +
+      '<div class="msum-main"><span>누적 실매출액</span><b>' + won(st.total) + '</b></div>' +
+      '<div class="msum-grid">' +
+        '<div><span>매출 건수</span><b>' + cnt + '건</b></div>' +
+        '<div><span>평균 매출</span><b>' + won(avg) + '</b></div>' +
+        '<div><span>방문 횟수</span><b>' + st.visits + '회</b></div>' +
+      '</div>' +
+    '</div>';
+  if (!recs.length) return sum + '<div class="empty">아직 매출 기록이 없어요<br><span>시술등록을 하면 매출로 잡혀요</span></div>';
+  return sum + '<div class="card pad">' + recs.map(function(r){
+    return '<div class="logrow">' +
+      '<span class="logtag charge">' + esc(r.pay || '결제') + '</span>' +
+      '<div class="logmain"><b>' + esc(r.menu) + '</b><span>' + dateLabel(r.date) + '</span></div>' +
+      '<div class="logamt">' + won(r.amount) + '</div>' +
+    '</div>';
+  }).join('') + '</div>';
+}
+
+/* ---------- 예약 ---------- */
+function dApptTab(c){
+  var list = apptsOf(c.id).slice().sort(function(a, b){
+    return String((b.date || '') + (b.time || '')).localeCompare(String((a.date || '') + (a.time || '')));
+  });
+  var booked = list.filter(function(a){ return a.status === 'booked'; });
+  var today = todayISO();
+  var upcoming = booked.filter(function(a){ return a.date >= today; })
+    .sort(function(a, b){ return String(a.date + a.time).localeCompare(String(b.date + b.time)); });
+  var sum = '<div class="msum card">' +
+      '<div class="msum-main"><span>총 예약</span><b>' + list.length + '건</b></div>' +
+      '<div class="msum-grid">' +
+        '<div><span>예약확정</span><b>' + booked.length + '건</b></div>' +
+        '<div><span>다가오는 예약</span><b>' + upcoming.length + '건</b></div>' +
+        '<div><span>이용완료</span><b>' + list.filter(function(a){ return a.status === 'done'; }).length + '건</b></div>' +
+      '</div>' +
+    '</div>';
+  if (!list.length) return sum + '<div class="empty">아직 예약이 없어요<br><span>예약등록으로 새 예약을 잡아 보세요</span></div>';
+  return sum + '<div class="card pad">' + list.map(function(a){
+    var s = apptState(a);
+    return '<div class="logrow" data-act="edit-appt" data-id="' + a.id + '">' +
+      '<span class="logtag ' + (a.status === 'booked' ? 'charge' : 'use') + '">' + esc(a.time || '--:--') + '</span>' +
+      '<div class="logmain"><b>' + esc(a.menu || '메뉴 미정') + '</b>' +
+        '<span>' + dateLabel(a.date) + ' · ' + num(a.minutes || apptMinutes(a)) + '분</span></div>' +
+      '<div class="logamt"><span class="badge ' + s.cls + '">' + s.label + '</span></div>' +
+    '</div>';
+  }).join('') + '</div>';
+}
+
+/* ---------- 선불액 ---------- */
+function dPrepaidTab(c){
+  var m = c.membership;
+  var logs = mlogsOf(c.id).slice().sort(function(a, b){
+    return String(b.date || '').localeCompare(String(a.date || ''));
+  });
+  if (!m){
+    return '<div class="card pad memb-empty"><div>등록된 선불권이 없어요</div>' +
+      '<button class="chip-add" data-act="charge" data-id="' + c.id + '">＋ 선불 등록</button></div>';
+  }
+  var isAmt = m.type === 'amount';
+  var exp = expiryInfo(m);
+  var sum = '<div class="msum card">' +
+      '<div class="msum-main"><span>사용 가능 선불액</span><b>' + (isAmt ? won(m.balance) : m.balance + '회') + '</b></div>' +
+      '<div class="msum-grid">' +
+        '<div><span>구분</span><b>' + (isAmt ? '정액권' : '횟수권') + '</b></div>' +
+        '<div><span>등록일</span><b>' + dotDate(m.openedAt) + '</b></div>' +
+        '<div><span>유효기간</span><b>' + (m.expiresAt ? dotDate(m.expiresAt) : '—') + '</b></div>' +
+      '</div>' +
+      (exp && exp.days <= 30 ? '<div class="hint" style="margin-top:9px;color:#A24B54;font-weight:800">' + esc(exp.label) + '</div>' : '') +
+      '<div class="dacts">' +
+        '<button class="btn sub primary" data-act="charge" data-id="' + c.id + '">＋ 선불액 충전</button>' +
+        '<button class="btn sub ghost" data-act="deduct" data-id="' + c.id + '">− 선불액 차감</button>' +
+      '</div>' +
+      (c.phone ? '<a class="btn sub ghost" style="margin-top:6px" href="' + esc(smsHref(c.phone, msgBalance(c))) + '">잔액 문자 보내기</a>' : '') +
+    '</div>';
+  if (!logs.length) return sum + '<div class="empty">아직 선불 내역이 없어요</div>';
+  return sum + '<div class="card pad">' + logs.map(function(l){
+    var isCh = l.action === 'charge';
+    var val = l.type === 'amount'
+      ? ((isCh ? '+' : '−') + won(l.value))
+      : ((isCh ? '+' : '−') + l.value + '회');
+    return '<div class="logrow">' +
+      '<span class="logtag ' + (isCh ? 'charge' : 'use') + '">' + (isCh ? '추가' : '차감') + '</span>' +
+      '<div class="logmain"><b>' + esc(l.memo || (isCh ? '선불 충전' : '선불 차감')) + '</b>' +
+        '<span>' + dateLabel(l.date) + ' · 잔여 ' + (l.type === 'amount' ? won(l.balanceAfter) : l.balanceAfter + '회') + '</span></div>' +
+      '<div class="logamt">' + val + '</div>' +
+    '</div>';
+  }).join('') + '</div>';
+}
+
 function stampCard(c){
   var n = Math.min(10, Math.max(0, num(c.stamps)));
   var cells = '';
@@ -1688,12 +1931,35 @@ function confirmSheet(title, desc, okLabel, onOk){
   $('cf-no').onclick = function(){ closeSheet(); };
 }
 
+/* 메뉴 등록 데이터는 category, 예전 데이터·백업은 cat 을 쓴다 */
+var MENU_CAT_ORDER = ['손','발','추가','속눈썹','눈썹','입술','기타'];
+function menuCat(t){ return (t && (t.category || t.cat)) || '기타'; }
+function menuCatSort(a, b){
+  var ia = MENU_CAT_ORDER.indexOf(a), ib = MENU_CAT_ORDER.indexOf(b);
+  return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+}
 function menuTagLabel(t, dupNames){
   var label = t.name;
-  if (dupNames[t.name] && t.cat && label.indexOf(t.cat) < 0){
-    label = label + '(' + t.cat + ')';
+  var cat = menuCat(t);
+  if (dupNames[t.name] && label.indexOf(cat) < 0){
+    label = label + '(' + cat + ')';
   }
   return label;
+}
+
+/* 탭마다 몇 개가 선택돼 있는지 배지로 갱신 */
+function refreshMenuTabCounts(form){
+  if (!form) return;
+  var byCat = {};
+  form.querySelectorAll('[data-act="tag-toggle"].on').forEach(function(b){
+    var c = b.getAttribute('data-cat') || '기타';
+    byCat[c] = (byCat[c] || 0) + 1;
+  });
+  form.querySelectorAll('.mcat-n').forEach(function(s){
+    var n = byCat[s.getAttribute('data-cat')] || 0;
+    s.textContent = n ? String(n) : '';
+    s.style.display = n ? '' : 'none';
+  });
 }
 
 function tagChips(selectedNames){
@@ -1702,37 +1968,61 @@ function tagChips(selectedNames){
   var cats = [];
   list.forEach(function(t){
     counts[t.name] = (counts[t.name] || 0) + 1;
-    var c = t.cat || '기타';
+    var c = menuCat(t);
     if (cats.indexOf(c) < 0) cats.push(c);
   });
+  cats.sort(menuCatSort);
   var dupNames = {};
   Object.keys(counts).forEach(function(k){ if (counts[k] > 1) dupNames[k] = true; });
-  var initCat = cats.length > 1 ? cats[0] : 'ALL';
-  var tabs = cats.length > 1
+
+  var sel = selectedNames || [];
+  var rows = list.map(function(t){
+    var label = menuTagLabel(t, dupNames);
+    return {
+      label: label,
+      cat: menuCat(t),
+      price: num(t.price),
+      on: sel.indexOf(label) >= 0 || (!dupNames[t.name] && sel.indexOf(t.name) >= 0)
+    };
+  });
+
+  var selCats = {};
+  rows.forEach(function(r){ if (r.on) selCats[r.cat] = (selCats[r.cat] || 0) + 1; });
+
+  var multi = cats.length > 1;
+  /* 고른 메뉴가 있으면 '전체'에서 열어 어떤 파트를 골랐든 선택된 칩이 바로 보이게 */
+  var initCat = !multi ? 'ALL' : (sel.length ? 'ALL' : cats[0]);
+
+  var tabs = multi
     ? '<div class="mcat-tabs">' +
         cats.map(function(c){
-          return '<button type="button" class="mcat-btn ' + (c === initCat ? 'on' : '') + '" data-act="mcat-filter" data-cat="' + esc(c) + '">' + esc(c) + '</button>';
+          var n = selCats[c] || 0;
+          return '<button type="button" class="mcat-btn' + (c === initCat ? ' on' : '') + '" data-act="mcat-filter" data-cat="' + esc(c) + '">' + esc(c) +
+            '<span class="mcat-n" data-cat="' + esc(c) + '"' + (n ? '' : ' style="display:none"') + '>' + (n || '') + '</span></button>';
         }).join('') +
-        '<button type="button" class="mcat-btn" data-act="mcat-filter" data-cat="ALL">전체</button>' +
+        '<button type="button" class="mcat-btn' + (initCat === 'ALL' ? ' on' : '') + '" data-act="mcat-filter" data-cat="ALL">전체</button>' +
       '</div>'
     : '';
-  return tabs + '<div class="tags">' + list.map(function(t, i){
-    var c = t.cat || '기타';
-    var label = menuTagLabel(t, dupNames);
-    var on = selectedNames && (selectedNames.indexOf(label) >= 0 || (!dupNames[t.name] && selectedNames.indexOf(t.name) >= 0));
-    var hide = (initCat !== 'ALL' && c !== initCat) ? ' style="display:none"' : '';
-    return '<button type="button" class="tag ' + (on ? 'on' : '') + '" data-act="tag-toggle" data-idx="' + i + '" data-cat="' + esc(c) + '" data-name="' + esc(label) + '" data-price="' + num(t.price) + '"' + hide + '>' +
-      esc(label) + '<span class="p">' + (num(t.price) ? wonShort(t.price) : '0') + '</span></button>';
+
+  return tabs + '<div class="tags">' + rows.map(function(r, i){
+    var hide = (multi && initCat !== 'ALL' && r.cat !== initCat) ? ' style="display:none"' : '';
+    return '<button type="button" class="tag ' + (r.on ? 'on' : '') + '" data-act="tag-toggle" data-idx="' + i + '" data-cat="' + esc(r.cat) + '" data-name="' + esc(r.label) + '" data-price="' + r.price + '"' + hide + '>' +
+      esc(r.label) + '<span class="p">' + (r.price ? wonShort(r.price) : '0') + '</span></button>';
   }).join('') + '</div>';
 }
 
 /* ---------- 예약 등록·수정 ---------- */
-function openAppointmentForm(id, presetDate, presetTime){
+function openAppointmentForm(id, presetDate, presetTime, presetCust){
   var a = id ? state.appointments.filter(function(x){ return x.id === id; })[0] : null;
   var date = a ? a.date : (presetDate || ui.selDate || todayISO());
   var timeVal = a ? (a.time || '') : (presetTime || '');
   var durVal = a ? (num(a.minutes) || apptMinutes(a)) : 60;
-  var selId = a ? (a.customerId || '') : '';
+  var selId = a ? (a.customerId || '') : (presetCust || '');
+  var linked = selId ? custById(selId) : null;
+  var jump = linked
+    ? '<button type="button" class="cust-jump" data-act="appt-cust" data-id="' + linked.id + '">' +
+        '<b>' + esc(linked.name) + '</b><span>고객 상세 ›</span></button>'
+    : '';
   var customerOpts = '<option value="">＋ 신규 고객 (직접 입력)</option>' + state.customers.map(function(c){
     return '<option value="' + c.id + '"' + (c.id === selId ? ' selected' : '') + '>' + esc(c.name) + (c.phone ? ' · ' + esc(c.phone) : '') + '</option>';
   }).join('');
@@ -1753,7 +2043,8 @@ function openAppointmentForm(id, presetDate, presetTime){
       '<button class="x" data-act="close" aria-label="닫기">✕</button></div>' +
     quickActs +
     '<form id="form-appt" data-id="' + (a ? a.id : '') + '">' +
-      '<div class="field"><label>고객</label><select name="customerId">' + customerOpts + '</select></div>' +
+      '<div class="field"><label>고객</label>' + jump + '<select name="customerId">' + customerOpts + '</select>' +
+        (jump ? '<div class="hint-line">다른 고객으로 바꾸려면 아래에서 골라 주세요</div>' : '') + '</div>' +
       '<div class="guest-field" hidden><div class="field"><label>이름 *</label>' +
         '<input name="guestName" value="' + (a && !a.customerId ? esc(a.guestName || '') : '') + '" placeholder="예약자 이름"></div>' +
         '<div class="field"><label>연락처</label><input name="guestPhone" type="tel" inputmode="tel" value="' +
@@ -2901,7 +3192,27 @@ function onAct(act, el){
     case 'tab': go(el.getAttribute('data-tab')); break;
     case 'open-cust':
       if (!id) break;
+      ui.detailTab = 'info';
       ui.detailId = id; showDetail();
+      break;
+    case 'appt-cust': {
+      var jumpC = custById(id);
+      if (!jumpC) break;
+      closeSheet();
+      ui.detailTab = 'info';
+      ui.detailId = jumpC.id;
+      showDetail();
+      break;
+    }
+    case 'detail-tab': {
+      var dtabKey = el.getAttribute('data-tab');
+      if (!dtabKey) break;
+      ui.detailTab = dtabKey;
+      renderDetail();
+      break;
+    }
+    case 'new-appt-cust':
+      openAppointmentForm(null, todayISO(), '', id || ui.detailId);
       break;
     case 'back': go('customers'); break;
     case 'new-cust': openCustomerForm(); break;
@@ -3147,6 +3458,7 @@ function onAct(act, el){
         el.classList.add('on');
       }
       menuInp.value = parts.join(' + ');
+      refreshMenuTabCounts(form);
       break;
     }
     case 'fill': {
