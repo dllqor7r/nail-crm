@@ -2993,6 +2993,9 @@ function openCharge(custId){
       '<label class="sopt"><input type="radio" name="memType" value="count"><span>횟수권</span></label>' +
     '</div></div>';
   }
+  // 유효기간 기본값: 오늘 + 1년 (기존 유효기간이 더 길면 그대로)
+  var expDefault = addOneYear(todayISO());
+  if (m && m.expiresAt && m.expiresAt > expDefault) expDefault = m.expiresAt;
   openSheet(
     '<div class="sheet-grip"></div>' +
     '<div class="sheet-head"><h3>선불 충전</h3><button class="x" data-act="close" aria-label="닫기">✕</button></div>' +
@@ -3000,7 +3003,7 @@ function openCharge(custId){
     '<form id="form-charge" data-id="' + c.id + '">' +
       typeField +
       '<div class="field"><label>유효기간 (선택)</label>' +
-        '<input type="date" name="expires" value="' + (m && m.expiresAt ? m.expiresAt : addOneYear((m && m.openedAt) || todayISO())) + '">' +
+        '<input type="date" name="expires" value="' + expDefault + '">' +
         '<div class="tags">' +
           '<button type="button" class="tag" data-act="fill" data-target="expires" data-value="' + datePlusMonths(6) + '">+6개월</button>' +
           '<button type="button" class="tag" data-act="fill" data-target="expires" data-value="' + datePlusMonths(12) + '">+1년</button>' +
@@ -3785,10 +3788,8 @@ function handleSubmit(e){
     if (!m3){ m3 = { type:t3, balance:0, openedAt:chargeDay3, expiresAt:addOneYear(chargeDay3) }; c3.membership = m3; }
     m3.balance += value3;
     m3.openedAt = chargeDay3;                 // 등록일 = 마지막 충전일
-    var exp3 = String(f3.get('expires') || '').trim();
-    var auto3 = addOneYear(chargeDay3);       // 유효기간은 최소 충전일 + 1년
-    if (!exp3 || exp3 < auto3) exp3 = auto3;
-    m3.expiresAt = exp3;
+    // 유효기간: 기본값은 충전일 + 1년, 직접 고른 날짜가 있으면 그대로
+    m3.expiresAt = String(f3.get('expires') || '').trim() || addOneYear(chargeDay3);
     state.mlogs.push({ id:uid(), customerId:c3.id, date:todayISO(), action:'charge', type:m3.type,
       value:value3, amount:paid3, balanceAfter:m3.balance, memo:'선불 충전' });
     save();
