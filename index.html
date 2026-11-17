@@ -1895,7 +1895,9 @@ function renderAnalysis(){
   var aov = mrecs.length ? Math.round(mrecs.reduce(function(s,r){ return s + num(r.amount); }, 0) / mrecs.length) : 0;
 
   /* 재방문율: 전체 누적 + 연도별 */
-  function totalVisits(c){ return (num(c.baseVisits) || 0) + recsOf(c.id).length; }
+  var recCnt = {};
+  state.records.forEach(function(r){ recCnt[r.customerId] = (recCnt[r.customerId] || 0) + 1; });
+  function totalVisits(c){ return (num(c.baseVisits) || 0) + (recCnt[c.id] || 0); }
   function cnt(v){ return num(v).toLocaleString('ko-KR'); }
   var vBase = state.customers.filter(function(c){ return totalVisits(c) >= 1; });
   var v1 = vBase.filter(function(c){ return totalVisits(c) === 1; });
@@ -1905,8 +1907,8 @@ function renderAnalysis(){
   var rrRate = vBase.length ? Math.round(v2plus / vBase.length * 1000) / 10 : 0;
   function seg(list2, color){ return list2.length ? '<i style="width:' + Math.round(list2.length / vBase.length * 100) + '%;background:' + color + '"></i>' : ''; }
   var newCs = state.customers.filter(function(c){ return !num(c.baseVisits); });
-  var newBase = newCs.filter(function(c){ return recsOf(c.id).length >= 1; });
-  var newRep = newCs.filter(function(c){ return recsOf(c.id).length >= 2; });
+  var newBase = newCs.filter(function(c){ return (recCnt[c.id] || 0) >= 1; });
+  var newRep = newCs.filter(function(c){ return (recCnt[c.id] || 0) >= 2; });
   var newHtml = newBase.length
     ? '<div class="rr-new">신규 등록 고객 재방문율 <b>' + (Math.round(newRep.length / newBase.length * 1000) / 10) + '%</b>' +
       ' <span>(' + newRep.length + '명 / ' + newBase.length + '명 · 앱에서 등록한 고객 ' + newCs.length + '명)</span></div>'
