@@ -2196,19 +2196,42 @@ function renderAnalysis(){
   });
   var pRecs = pFlip ? [] : state.records.filter(function(r){ return r.date >= pStart && r.date <= pEnd; });
   var pCharges = pFlip ? [] : state.mlogs.filter(function(l){ return l.action === 'charge' && l.date >= pStart && l.date <= pEnd; });
-  var pCard = 0, pCash = 0, pMem = 0, pCust = {}, pMenu = {};
+  var pHasPrepaid = !!(state.kpi && state.kpi.prepaidSales);
+  var pPrepaid = pFlip ? [] : (pHasPrepaid ? state.kpi.prepaidSales : []).filter(function(x){
+    return x.date >= pStart && x.date <= pEnd;
+  });
+  var pCard = 0, pCash = 0, pMem = 0, pRecPay = 0, pCust = {}, pMenu = {};
   pRecs.forEach(function(r){
-    var pa = num(r.amount);
-    if (r.pay === PAY_MEM) pMem += pa;
-    else if (r.pay === PAY_CASH) pCash += pa;
-    else pCard += pa;
+    var gross = num(r.amount);
+    var ded, net, netCard;
+    if (r.net === undefined || r.net === null){
+      // 실결제 정보가 없는 기록: 선불 기록은 전액 선불 차감으로 본다
+      ded = (r.pay === PAY_MEM) ? gross : 0;
+      net = gross - ded;
+      netCard = (r.pay === PAY_CASH) ? 0 : net;
+    } else {
+      ded = num(r.prepaidUsed);
+      net = num(r.net);
+      netCard = num(r.netCard);
+    }
+    pMem += ded;
+    pRecPay += net;
+    pCard += netCard;
+    pCash += net - netCard;
     pCust[r.customerId] = 1;
     var mk = r.menu || '기타';
     if (!pMenu[mk]) pMenu[mk] = { n:0, amt:0 };
-    pMenu[mk].n++; pMenu[mk].amt += pa;
+    pMenu[mk].n++; pMenu[mk].amt += gross;
   });
-  var pCharge = pCharges.reduce(function(s, l){ return s + num(l.amount); }, 0);
-  var pSales = pCard + pCash + pCharge;
+  var pChargeApp = pCharges.reduce(function(s, l){ return s + num(l.amount); }, 0);
+  var pChargePre = 0;
+  pPrepaid.forEach(function(x){
+    var v = num(x.net);
+    pChargePre += v;
+    if (x.pay === PAY_CASH) pCash += v; else pCard += v;
+  });
+  var pCharge = pChargeApp + pChargePre;
+  var pSales = pCard + pCash + pChargeApp;
   var pCustN = Object.keys(pCust).length;
   var pBefore2026 = pStart < '2026-01-01';
   var pNoRec = pBefore2026 && !pRecs.length;
@@ -2218,7 +2241,7 @@ function renderAnalysis(){
   var pPayRows = [
     { label:'카드', v:pCard, color:'#18181B' },
     { label:'현금·이체', v:pCash, color:'#52525B' },
-    { label:'선불 충전', v:pCharge, color:'#6B7280' }
+    { label:'선불 충전', v:pChargeApp, color:'#6B7280' }
   ];
   if (pMem) pPayRows.push({ label:'선불 차감 (매출 제외)', v:pMem, color:'#D1D5DB' });
   var pPayTotal = pSales + pMem;
@@ -2260,8 +2283,8 @@ function renderAnalysis(){
     pBody =
       '<div class="pr-sum">' + pDateLabel + ' 매출 <b>' + won(pSales) + '</b></div>' +
       '<div class="pr-lines">' +
-        '<div><span>시술 실결제 (카드·현금)</span><b>' + won(pCard + pCash) + '</b></div>' +
-        '<div><span>선불 충전</span><b>' + won(pCharge) + '</b></div>' +
+        '<div><span>시술 실결제 (카드·현금)</span><b>' + won(pRecPay) + '</b></div>' +
+        '<div><span>선불권·정기권 충전' + (pPrepaid.length ? ' ' + pPrepaid.length + '건' : '') + '</span><b>' + won(pCharge) + '</b></div>' +
         (pMem ? '<div><span>선불 차감</span><b>' + won(pMem) + '</b></div>' : '') +
       '</div>' +
       '<div class="pr-kpi">' +
@@ -2269,7 +2292,7 @@ function renderAnalysis(){
         '<div><span>방문 고객</span><b>' + cnt(pCustN) + '명</b></div>' +
       '</div>' +
       (pRecs.length ? '' : '<div class="pr-notice">이 기간에는 시술 기록이 없어요.</div>') +
-      (pPayTotal ? '<div class="sec-head" style="margin:16px 0 8px"><h2 style="font-size:12.5px">결제수단별</h2><span class="hint">선불 차감 포함</span></div>' +
+      (pPayTotal ? '<div class="sec-head" style="margin:16px 0 8px"><h2 style="font-size:12.5px">결제수단별</h2><span class="hint">선불권 충전 포함 · 선불 차감 별도</span></div>' +
         '<div class="dist-bar">' + pPayBar + '</div><div class="pay-legend">' + pPayHtml + '</div>' : '') +
       (pTop.length ? '<div class="sec-head" style="margin:18px 0 4px"><h2 style="font-size:12.5px">인기 시술 TOP ' + pTop.length + '</h2><span class="hint">건수 기준</span></div>' +
         '<div class="top5">' + pTop.map(function(t, i){
@@ -2278,7 +2301,9 @@ function renderAnalysis(){
               '<div class="t5bar"><i style="width:' + Math.max(6, Math.round(t.n / pTop[0].n * 100)) + '%"></i></div></div>' +
             '<div class="t5val"><b>' + t.n + '건</b>' + (t.amt ? '<span>' + won(t.amt) + '</span>' : '') + '</div></div>';
         }).join('') + '</div>' : '') +
-      '<div class="pr-note">건별 기록(매출 원장) 기준이에요. 선불 차감은 충전할 때 이미 매출로 잡혀 총매출에서 뺐어요. 팅커뷰 월 결산까지 포함한 값은 아래 <b>월별 매출 비교</b>에서 볼 수 있어요.</div>';
+      (pBefore2026 ? '<div class="pr-note">선불 차감은 충전할 때 이미 매출로 잡혀 총매출에서 뺐어요.</div>' :
+        (pHasPrepaid ? '<div class="pr-note">매출 원장에 선불권·정기권 신규 충전까지 넣었어요. 2026년 1월부터는 이 값이 팅커뷰 <b>월 결산</b>과 1원까지 같아요. 선불 차감은 충전할 때 이미 매출로 잡혀 총매출에서 뺐어요.</div>' :
+        '<div class="pr-note">건별 기록(매출 원장) 기준이에요. 이 기기에 선불권 충전 내역이 없어 결산과 차이가 날 수 있어요 — 상단 [백업] → [JSON 파일 불러오기]로 최신 데이터를 한 번 불러오면 1원까지 맞아요.</div>'));
   }
   var prHtml =
     '<div class="sec"><div class="sec-head"><h2>기간별 매출 조회</h2><span class="hint">내가 고른 기간</span></div>' +
