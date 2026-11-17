@@ -1048,7 +1048,7 @@ function dayTimetable(date, list){
     var name = apptName(a);
     var badges = '';
     if (c && c.membership && c.membership.type === 'amount' && num(c.membership.balance) > 0){
-      badges += '<span class="tt-ev-badge">선불 ' + wonShort(c.membership.balance) + '</span>';
+      badges += '<span class="tt-ev-badge">선불 ' + won(c.membership.balance) + '</span>';
     } else if (c && c.membership && c.membership.type === 'count' && num(c.membership.balance) > 0){
       badges += '<span class="tt-ev-badge">' + num(c.membership.balance) + '회</span>';
     }
