@@ -897,6 +897,16 @@ function joinMsg(head, body){
   var t = tailText();
   return (head + body + (t ? ' ' + t : '')).replace(/\s+/g, ' ').trim();
 }
+// 문자 문구용: 줄바꿈(\n)은 살리고, 줄마다 앞뒤 공백만 정돈한다
+function tidyMsgText(v){
+  return String(v === null || v === undefined ? '' : v)
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map(function(line){ return line.replace(/[ \t]+/g, ' ').trim(); })
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/^\n+|\n+$/g, '');
+}
 function msgUse(c, m, value){
   var head = c.name + '님 ' + hello() + ' ';
   if (m.type === 'amount'){
@@ -933,18 +943,17 @@ function msgReminder(a){
   var d = parseISO(a.date);
   var when = (d.getMonth()+1) + '월 ' + d.getDate() + '일 ' + WEEK[d.getDay()] + '요일' + (a.time ? ' ' + a.time : '');
   var tpl = String(state.settings.reminderTemplate || '').trim() || DEFAULT_REMINDER_TPL;
-  var body = tpl
+  var body = tidyMsgText(tpl
     .replace(/\{고객명\}/g, apptName(a))
     .replace(/\{매장명\}/g, String(state.settings.shopName || '').trim())
     .replace(/\{날짜\}/g, when)
     .replace(/\{메뉴\}/g, a.menu || '')
-    .replace(/\{인사말\}/g, hello())
-    .replace(/\s+/g, ' ').trim();
+    .replace(/\{인사말\}/g, hello()));
   var t2 = tailText();
   if (t2){
     var hasTail = (String(state.settings.signoff || '').trim() && body.indexOf(String(state.settings.signoff || '').trim()) >= 0) ||
       (String(state.settings.shopName || '').trim() && body.indexOf(String(state.settings.shopName || '').trim()) >= 0);
-    if (!hasTail) body += ' ' + t2;
+    if (!hasTail) body += (body.indexOf('\n') >= 0 ? '\n' : ' ') + t2;
   }
   return body;
 }
@@ -3001,8 +3010,8 @@ function openSettings(){
           '<textarea name="aftercare" style="min-height:116px">' + esc(state.settings.aftercare || DEFAULT_AFTERCARE) + '</textarea>' +
           '<div class="hint-line">{이름} · {날짜} · {주기} 가 자동으로 바뀌어 들어가요</div></div>' +
         '<div class="field"><label>예약 리마인드 문자 문구</label>' +
-          '<textarea name="reminderTpl" id="reminder-tpl" style="min-height:88px">' + esc(state.settings.reminderTemplate || DEFAULT_REMINDER_TPL) + '</textarea>' +
-          '<div class="hint-line" style="margin-top:6px">아래 치환 문구가 실제 내용으로 바뀌어 들어가요</div>' +
+          '<textarea name="reminderTpl" id="reminder-tpl" rows="4" spellcheck="false" style="min-height:96px;padding:11px 12px;border:1px solid var(--line);border-radius:12px;line-height:1.6;resize:vertical">' + esc(state.settings.reminderTemplate || DEFAULT_REMINDER_TPL) + '</textarea>' +
+          '<div class="hint-line" style="margin-top:6px">엔터로 줄을 바꾸면 그 줄 그대로 문자에 들어가요 · 아래 치환 문구는 실제 내용으로 바뀝니다</div>' +
           '<div style="margin:6px 0 0"><span class="tok">{고객명}</span><span class="tok">{매장명}</span><span class="tok">{날짜}</span><span class="tok">{메뉴}</span><span class="tok">{인사말}</span></div>' +
           '<div class="msg-prev" id="reminder-prev"></div>' +
           '<button type="button" class="btn sub ghost" data-act="reminder-reset" style="margin-top:8px">기본 문구로 되돌리기</button>' +
