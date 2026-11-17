@@ -809,7 +809,7 @@ function isVip(c){
   return st.visits >= 8 || st.total >= 400000;
 }
 function daysToExpiry(m){
-  if (!m || !m.expiresAt) return null;
+  if (!m || m.unlimited || !m.expiresAt) return null;
   return diffDays(todayISO(), m.expiresAt);
 }
 function expiryInfo(m){
@@ -853,6 +853,7 @@ function syncPrepaidDates(customers, charges){
   (customers || []).forEach(function(c){
     var m = c && c.membership;
     if (!m) return;
+    if (m.unlimited) return;   // 팅커뷰 '무제한' 선불권은 유효기간을 만들지 않는다
     var op = String(m.openedAt || '');
     var last = map[c.id] || '';
     if (last && last > op){          // 마지막 충전이 등록일보다 뒤 → 등록일·유효기간 모두 그 날짜 기준으로
@@ -1029,7 +1030,7 @@ function msgDeduct(c, m, value){
     .replace(/\{고객명\}/g, c.name)
     .replace(/\{차감액\}/g, isAmt ? num(value).toLocaleString('ko-KR') : (num(value) + '회'))
     .replace(/\{잔액\}/g, isAmt ? num(m.balance).toLocaleString('ko-KR') : (num(m.balance) + '회'))
-    .replace(/\{유효기간\}/g, m.expiresAt ? dotDate(m.expiresAt) : '—')
+    .replace(/\{유효기간\}/g, m.unlimited ? '무제한' : (m.expiresAt ? dotDate(m.expiresAt) : '—'))
     .replace(/\{인사말\}/g, hello())
     .replace(/\{매장명\}/g, String(state.settings.shopName || '').trim()))
     .replace(/(\d)회원(?![가-힣])/g, '$1회');
@@ -1041,7 +1042,7 @@ function msgExpiry(c, m){
   return tidyMsgText(tpl
     .replace(/\{고객명\}/g, c.name)
     .replace(/\{잔액\}/g, m.type === 'amount' ? num(m.balance).toLocaleString('ko-KR') : (num(m.balance) + '회'))
-    .replace(/\{유효기간\}/g, m.expiresAt ? dotDate(m.expiresAt) : '')
+    .replace(/\{유효기간\}/g, m.unlimited ? '무제한' : (m.expiresAt ? dotDate(m.expiresAt) : ''))
     .replace(/\{남은일수\}/g, left === null ? '' : String(Math.max(0, left)))
     .replace(/\{인사말\}/g, hello())
     .replace(/\{매장명\}/g, String(state.settings.shopName || '').trim()))
@@ -1792,7 +1793,7 @@ function dPrepaidTab(c){
       '<div class="msum-grid">' +
         '<div><span>구분</span><b>' + (isAmt ? '정액권' : '횟수권') + '</b></div>' +
         '<div><span>최근 충전일</span><b>' + dotDate(m.openedAt) + '</b></div>' +
-        '<div><span>유효기간</span><b>' + (m.expiresAt ? dotDate(m.expiresAt) : '—') + '</b></div>' +
+        '<div><span>유효기간</span><b>' + (m.unlimited ? '무제한' : (m.expiresAt ? dotDate(m.expiresAt) : '—')) + '</b></div>' +
       '</div>' +
       (exp && exp.days <= 30 ? '<div class="hint" style="margin-top:9px;color:#A24B54;font-weight:800">' + esc(exp.label) + '</div>' : '') +
       '<div class="dacts">' +
@@ -1846,8 +1847,9 @@ function membBlock(c){
     '<div class="mcard-bal">' + bal + '</div>' +
     '<div class="mcard-sub">' + (m.type === 'amount' ? '남은 잔액' : '남은 횟수') +
       (isLowBalance(c) ? ' · 재충전 시기예요' : '') + '</div>' +
-    (m.expiresAt ? '<div class="mcard-sub" style="margin-top:4px;opacity:.95">유효기간 ' + esc(m.expiresAt.replace(/-/g,'.')) +
-      (expiryInfo(m) ? ' · ' + expiryInfo(m).label : '') + '</div>' : '') +
+    (m.unlimited ? '<div class="mcard-sub" style="margin-top:4px;opacity:.95">유효기간 무제한</div>' :
+      (m.expiresAt ? '<div class="mcard-sub" style="margin-top:4px;opacity:.95">유효기간 ' + esc(m.expiresAt.replace(/-/g,'.')) +
+      (expiryInfo(m) ? ' · ' + expiryInfo(m).label : '') + '</div>' : '')) +
     '<div class="mcard-acts">' +
       '<button data-act="charge" data-id="' + c.id + '">충전</button>' +
       '<button data-act="deduct" data-id="' + c.id + '">차감</button>' +
@@ -1940,7 +1942,7 @@ function renderPrepaid(){
           ' <span class="badge ' + (m.type === 'amount' ? 'st-freq' : 'st-new') + '">' + (m.type === 'amount' ? '정액권' : '횟수권') + '</span>' +
           (lowFlag ? ' <span class="badge st-low">재충전 시기</span>' : '') + expBadge + '</div>' +
           '<div class="meta">' + esc(c.phone || '연락처 없음') + ' · 방문 ' + custStats(c).visits + '회' +
-          (m.expiresAt ? (' · 유효기간 ' + esc(String(m.expiresAt).replace(/-/g,'.'))) : '') + '</div></div>' +
+          (m.unlimited ? ' · 유효기간 무제한' : (m.expiresAt ? (' · 유효기간 ' + esc(String(m.expiresAt).replace(/-/g,'.'))) : '')) + '</div></div>' +
         '<div class="mrow-bal"><b>' + bal + '</b><span>남은 ' + (m.type === 'amount' ? '잔액' : '횟수') + '</span></div>' +
       '</div>' +
       '<div class="mrow-acts">' + acts + '</div>' +
